@@ -3,6 +3,7 @@ package upstream
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -305,6 +306,35 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 		// 不回滚订单，仅记录错误
 	}
 
+	// 自动使用钱包余额支付（上游 API 订单默认钱包扣款）
+	payResult, payErr := h.PaymentService.CreatePayment(service.CreatePaymentInput{
+		OrderID:    order.ID,
+		UseBalance: true,
+		ClientIP:   c.ClientIP(),
+	})
+	if payErr != nil {
+		logger.Errorw("upstream_auto_wallet_pay_failed",
+			"order_id", order.ID,
+			"error", payErr,
+		)
+		// 钱包余额不足或支付失败，返回 200 + ok:false 让 A 站正确解析错误码
+		c.JSON(http.StatusOK, gin.H{
+			"ok":            false,
+			"order_id":      order.ID,
+			"order_no":      order.OrderNo,
+			"status":        order.Status,
+			"error_code":    "payment_failed",
+			"error_message": fmt.Sprintf("wallet payment failed: %s", payErr.Error()),
+		})
+		return
+	}
+
+	// 刷新订单状态
+	finalStatus := order.Status
+	if payResult != nil && payResult.OrderPaid {
+		finalStatus = constants.OrderStatusPaid
+	}
+
 	// 币种
 	currency, _ := h.SettingService.GetSiteCurrency("CNY")
 
@@ -312,7 +342,7 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 		"ok":       true,
 		"order_id": order.ID,
 		"order_no": order.OrderNo,
-		"status":   order.Status,
+		"status":   finalStatus,
 		"amount":   order.TotalAmount.StringFixed(2),
 		"currency": currency,
 	})
@@ -442,6 +472,65 @@ type callbackPayload struct {
 
 // HandleCallback POST /api/v1/upstream/callback (A 站点接收 B 站回调)
 func (h *Handler) HandleCallback(c *gin.Context) {
+	// ---- 签名验证 ----
+	apiKey := c.GetHeader(upstreamadapter.HeaderApiKey)
+	timestampStr := c.GetHeader(upstreamadapter.HeaderTimestamp)
+	signature := c.GetHeader(upstreamadapter.HeaderSignature)
+
+	if apiKey == "" || timestampStr == "" || signature == "" {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "message": "missing authentication headers"})
+		return
+	}
+
+	timestamp, err := upstreamadapter.ParseTimestamp(timestampStr)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "message": "invalid timestamp"})
+		return
+	}
+
+	if !upstreamadapter.IsTimestampValid(timestamp) {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "message": "timestamp expired"})
+		return
+	}
+
+	// 根据 api_key 查找对应的站点连接
+	conn, err := h.SiteConnectionRepo.GetByApiKey(apiKey)
+	if err != nil {
+		logger.Errorw("upstream_callback_lookup_connection_failed", "api_key", apiKey, "error", err)
+		c.JSON(http.StatusOK, gin.H{"ok": false, "message": "internal error"})
+		return
+	}
+	if conn == nil || conn.Status != "active" {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "message": "invalid api key"})
+		return
+	}
+
+	// 读取 body 用于签名验证
+	var body []byte
+	if c.Request.Body != nil {
+		body, err = io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{"ok": false, "message": "failed to read request body"})
+			return
+		}
+		c.Request.Body = io.NopCloser(&bodyBuf{data: body})
+	}
+
+	// 解密 api_secret 并验证签名
+	apiSecret := conn.ApiSecret
+	if h.SiteConnectionService != nil {
+		if decrypted, decErr := h.SiteConnectionService.DecryptSecret(apiSecret); decErr == nil {
+			apiSecret = decrypted
+		}
+	}
+
+	if !upstreamadapter.Verify(apiSecret, "POST", "/api/v1/upstream/callback", signature, timestamp, body) {
+		logger.Warnw("upstream_callback_signature_invalid", "api_key", apiKey)
+		c.JSON(http.StatusOK, gin.H{"ok": false, "message": "signature verification failed"})
+		return
+	}
+
+	// ---- 解析 payload ----
 	var payload callbackPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusOK, gin.H{"ok": false, "message": "invalid request body"})
@@ -492,6 +581,21 @@ func (h *Handler) HandleCallback(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "received"})
+}
+
+// bodyBuf 用于重置 body
+type bodyBuf struct {
+	data   []byte
+	offset int
+}
+
+func (b *bodyBuf) Read(p []byte) (n int, err error) {
+	if b.offset >= len(b.data) {
+		return 0, io.EOF
+	}
+	n = copy(p, b.data[b.offset:])
+	b.offset += n
+	return n, nil
 }
 
 // mapCallbackStatus 将上游订单状态映射为回调处理状态

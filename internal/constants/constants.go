@@ -384,6 +384,15 @@ const (
 	NotificationBizTypeWalletRecharge  = "wallet_recharge"
 	NotificationBizTypeDashboardAlert  = "dashboard_alert"
 	NotificationBizTypePaymentCallback = "payment_callback"
+	NotificationBizTypeProcurement     = "procurement"
+	NotificationBizTypeReconciliation  = "reconciliation"
+)
+
+// 对账差异类型常量
+const (
+	MismatchTypeStatus = "status"
+	MismatchTypeAmount = "amount"
+	MismatchTypeBoth   = "both"
 )
 
 // 卡密批次来源常量

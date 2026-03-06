@@ -16,6 +16,8 @@ import (
 	"github.com/dujiao-next/internal/queue"
 	"github.com/dujiao-next/internal/repository"
 	"github.com/dujiao-next/internal/upstream"
+
+	"github.com/hibiken/asynq"
 )
 
 var (
@@ -224,13 +226,12 @@ func (s *DownstreamCallbackService) handleCallbackFailure(ref *models.Downstream
 		if s.queueClient != nil {
 			if err := s.queueClient.EnqueueDownstreamCallback(queue.DownstreamCallbackPayload{
 				DownstreamOrderRefID: ref.ID,
-			}); err != nil {
+			}, asynq.ProcessIn(delay)); err != nil {
 				logger.Warnw("downstream_callback_requeue_failed",
 					"ref_id", ref.ID,
 					"error", err,
 				)
 			}
-			_ = delay // delay is handled by retry scheduling
 		}
 	}
 

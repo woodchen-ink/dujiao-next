@@ -11,6 +11,7 @@ import (
 // SiteConnectionRepository 对接连接数据访问接口
 type SiteConnectionRepository interface {
 	GetByID(id uint) (*models.SiteConnection, error)
+	GetByApiKey(apiKey string) (*models.SiteConnection, error)
 	Create(conn *models.SiteConnection) error
 	Update(conn *models.SiteConnection) error
 	Delete(id uint) error
@@ -38,6 +39,18 @@ func NewSiteConnectionRepository(db *gorm.DB) *GormSiteConnectionRepository {
 func (r *GormSiteConnectionRepository) GetByID(id uint) (*models.SiteConnection, error) {
 	var conn models.SiteConnection
 	if err := r.db.First(&conn, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &conn, nil
+}
+
+// GetByApiKey 根据 ApiKey 获取连接
+func (r *GormSiteConnectionRepository) GetByApiKey(apiKey string) (*models.SiteConnection, error) {
+	var conn models.SiteConnection
+	if err := r.db.Where("api_key = ?", apiKey).First(&conn).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}

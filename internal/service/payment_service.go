@@ -131,7 +131,7 @@ func shouldMarkFulfilling(order *models.Order) bool {
 	}
 	for _, item := range order.Items {
 		fulfillmentType := strings.TrimSpace(item.FulfillmentType)
-		if fulfillmentType == "" || fulfillmentType == constants.FulfillmentTypeManual {
+		if fulfillmentType == "" || fulfillmentType == constants.FulfillmentTypeManual || fulfillmentType == constants.FulfillmentTypeUpstream {
 			return true
 		}
 	}

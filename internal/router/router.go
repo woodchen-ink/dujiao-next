@@ -339,6 +339,12 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 				authorized.GET("/procurement-orders/:id", adminHandler.GetProcurementOrder)
 				authorized.POST("/procurement-orders/:id/retry", adminHandler.RetryProcurementOrder)
 				authorized.POST("/procurement-orders/:id/cancel", adminHandler.CancelProcurementOrder)
+
+				// 对账管理
+				authorized.POST("/reconciliation/run", adminHandler.RunReconciliation)
+				authorized.GET("/reconciliation/jobs", adminHandler.GetReconciliationJobs)
+				authorized.GET("/reconciliation/jobs/:id", adminHandler.GetReconciliationJob)
+				authorized.PUT("/reconciliation/items/:id/resolve", adminHandler.ResolveReconciliationItem)
 			}
 		}
 	}

@@ -655,6 +655,7 @@ func (s *ProcurementOrderService) hasUpstreamItems(order *models.Order) bool {
 func isRetryableErrorCode(code string) bool {
 	nonRetryable := map[string]bool{
 		"insufficient_balance": true,
+		"payment_failed":       true,
 		"product_unavailable":  true,
 		"sku_unavailable":      true,
 		"invalid_request":      true,

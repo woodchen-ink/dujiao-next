@@ -49,6 +49,8 @@ type Container struct {
 	SKUMappingRepo         repository.SKUMappingRepository
 	ProcurementOrderRepo   repository.ProcurementOrderRepository
 	DownstreamOrderRefRepo repository.DownstreamOrderRefRepository
+	ReconciliationJobRepo  repository.ReconciliationJobRepository
+	ReconciliationItemRepo repository.ReconciliationItemRepository
 
 	// Services
 	AuthzService              *authz.Service
@@ -82,6 +84,7 @@ type Container struct {
 	ProductMappingService     *service.ProductMappingService
 	ProcurementOrderService   *service.ProcurementOrderService
 	DownstreamCallbackService *service.DownstreamCallbackService
+	ReconciliationService     *service.ReconciliationService
 }
 
 // NewContainer 初始化容器
@@ -150,6 +153,8 @@ func (c *Container) initRepositories() {
 	c.SKUMappingRepo = repository.NewSKUMappingRepository(db)
 	c.ProcurementOrderRepo = repository.NewProcurementOrderRepository(db)
 	c.DownstreamOrderRefRepo = repository.NewDownstreamOrderRefRepository(db)
+	c.ReconciliationJobRepo = repository.NewReconciliationJobRepository(db)
+	c.ReconciliationItemRepo = repository.NewReconciliationItemRepository(db)
 }
 
 func (c *Container) initServices() {
@@ -243,6 +248,10 @@ func (c *Container) initServices() {
 	c.ProcurementOrderService = service.NewProcurementOrderService(
 		c.ProcurementOrderRepo, c.OrderRepo, c.ProductMappingRepo, c.SKUMappingRepo,
 		c.SiteConnectionService, c.QueueClient, c.FulfillmentService,
+	)
+	c.ReconciliationService = service.NewReconciliationService(
+		c.ReconciliationJobRepo, c.ReconciliationItemRepo, c.ProcurementOrderRepo,
+		c.SiteConnectionService, c.QueueClient, c.NotificationService,
 	)
 	c.PaymentService.SetProcurementService(c.ProcurementOrderService)
 	c.PaymentService.SetDownstreamCallbackService(c.DownstreamCallbackService)

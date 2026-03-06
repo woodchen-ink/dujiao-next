@@ -29,6 +29,8 @@ const (
 	TaskProcurementPollStatus = constants.TaskProcurementPollStatus
 	// TaskDownstreamCallback 下游回调通知任务
 	TaskDownstreamCallback = constants.TaskDownstreamCallback
+	// TaskReconciliationRun 对账执行任务
+	TaskReconciliationRun = constants.TaskReconciliationRun
 )
 
 // OrderStatusEmailPayload 订单状态邮件任务载荷
@@ -143,6 +145,20 @@ func NewProcurementPollStatusTask(payload ProcurementPollStatusPayload) (*asynq.
 		return nil, err
 	}
 	return asynq.NewTask(TaskProcurementPollStatus, body), nil
+}
+
+// ReconciliationRunPayload 对账执行任务载荷
+type ReconciliationRunPayload struct {
+	JobID uint `json:"job_id"`
+}
+
+// NewReconciliationRunTask 创建对账执行任务
+func NewReconciliationRunTask(payload ReconciliationRunPayload) (*asynq.Task, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(TaskReconciliationRun, body), nil
 }
 
 // DownstreamCallbackPayload 下游回调通知任务载荷

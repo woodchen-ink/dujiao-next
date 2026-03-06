@@ -99,7 +99,7 @@ func (s *OrderService) buildOrderResult(input orderCreateParams) (*orderBuildRes
 		if fulfillmentType == "" {
 			fulfillmentType = constants.FulfillmentTypeManual
 		}
-		if fulfillmentType != constants.FulfillmentTypeManual && fulfillmentType != constants.FulfillmentTypeAuto {
+		if fulfillmentType != constants.FulfillmentTypeManual && fulfillmentType != constants.FulfillmentTypeAuto && fulfillmentType != constants.FulfillmentTypeUpstream {
 			return nil, ErrFulfillmentInvalid
 		}
 		if fulfillmentType == constants.FulfillmentTypeManual &&

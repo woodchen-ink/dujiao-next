@@ -21,6 +21,7 @@ type ProcurementOrderRepository interface {
 	List(filter ProcurementOrderListFilter) ([]models.ProcurementOrder, int64, error)
 	ListRetriable(now time.Time, limit int) ([]models.ProcurementOrder, error)
 	ListByLocalOrderIDs(localOrderIDs []uint) ([]models.ProcurementOrder, error)
+	ListByConnectionAndTimeRange(connectionID uint, start, end time.Time) ([]models.ProcurementOrder, error)
 	Transaction(fn func(tx *gorm.DB) error) error
 	WithTx(tx *gorm.DB) *GormProcurementOrderRepository
 }
@@ -174,6 +175,16 @@ func (r *GormProcurementOrderRepository) ListByLocalOrderIDs(localOrderIDs []uin
 	}
 	var orders []models.ProcurementOrder
 	if err := r.db.Where("local_order_id IN ?", localOrderIDs).Find(&orders).Error; err != nil {
+		return nil, err
+	}
+	return orders, nil
+}
+
+// ListByConnectionAndTimeRange 按连接和时间范围查询采购单
+func (r *GormProcurementOrderRepository) ListByConnectionAndTimeRange(connectionID uint, start, end time.Time) ([]models.ProcurementOrder, error) {
+	var orders []models.ProcurementOrder
+	q := r.db.Where("connection_id = ? AND created_at >= ? AND created_at <= ?", connectionID, start, end)
+	if err := q.Find(&orders).Error; err != nil {
 		return nil, err
 	}
 	return orders, nil

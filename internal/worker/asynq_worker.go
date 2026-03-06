@@ -45,6 +45,7 @@ func (c *Consumer) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(queue.TaskProcurementSubmit, c.handleProcurementSubmit)
 	mux.HandleFunc(queue.TaskProcurementPollStatus, c.handleProcurementPollStatus)
 	mux.HandleFunc(queue.TaskDownstreamCallback, c.handleDownstreamCallback)
+	mux.HandleFunc(queue.TaskReconciliationRun, c.handleReconciliationRun)
 }
 
 func (c *Consumer) handleOrderStatusEmail(_ context.Context, task *asynq.Task) error {
@@ -352,6 +353,29 @@ func (c *Consumer) handleDownstreamCallback(_ context.Context, task *asynq.Task)
 	if err := c.DownstreamCallbackService.SendCallback(payload.DownstreamOrderRefID); err != nil {
 		logger.Warnw("worker_downstream_callback_failed",
 			"ref_id", payload.DownstreamOrderRefID,
+			"error", err,
+		)
+		return err
+	}
+	return nil
+}
+
+func (c *Consumer) handleReconciliationRun(ctx context.Context, task *asynq.Task) error {
+	if c == nil || task == nil || c.ReconciliationService == nil {
+		logger.Debugw("worker_reconciliation_run_skip_nil")
+		return nil
+	}
+	var payload queue.ReconciliationRunPayload
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+		logger.Warnw("worker_reconciliation_run_unmarshal_failed", "error", err)
+		return err
+	}
+	if payload.JobID == 0 {
+		return nil
+	}
+	if err := c.ReconciliationService.Execute(ctx, payload.JobID); err != nil {
+		logger.Warnw("worker_reconciliation_run_failed",
+			"job_id", payload.JobID,
 			"error", err,
 		)
 		return err

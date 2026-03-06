@@ -171,6 +171,20 @@ func (c *Client) EnqueueDownstreamCallback(payload DownstreamCallbackPayload, op
 	return err
 }
 
+// EnqueueReconciliationRun 入队对账执行任务
+func (c *Client) EnqueueReconciliationRun(payload ReconciliationRunPayload, opts ...asynq.Option) error {
+	if !c.Enabled() {
+		return nil
+	}
+	task, err := NewReconciliationRunTask(payload)
+	if err != nil {
+		return err
+	}
+	options := append([]asynq.Option{asynq.Queue(c.defaultQueue)}, opts...)
+	_, err = c.client.Enqueue(task, options...)
+	return err
+}
+
 // BuildServerConfig 生成队列服务配置
 func BuildServerConfig(cfg *config.QueueConfig) (asynq.RedisClientOpt, asynq.Config) {
 	opt := buildRedisOpt(cfg)

@@ -246,3 +246,8 @@ func (s *SiteConnectionService) GetAdapter(conn *models.SiteConnection) (upstrea
 func (s *SiteConnectionService) decryptSecret(conn *models.SiteConnection) (string, error) {
 	return crypto.Decrypt(s.encryptKey, conn.ApiSecret)
 }
+
+// DecryptSecret 解密加密后的 api_secret（公开方法，用于回调签名验证）
+func (s *SiteConnectionService) DecryptSecret(encrypted string) (string, error) {
+	return crypto.Decrypt(s.encryptKey, encrypted)
+}
