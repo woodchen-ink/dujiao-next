@@ -16,6 +16,10 @@ const (
 	settingSiteScriptsMaxCount       = 20
 	settingSiteScriptNameMaxRuneSize = 120
 	settingSiteScriptCodeMaxRuneSize = 20000
+
+	settingSiteFooterLinksMaxCount       = 20
+	settingSiteFooterLinkNameMaxRuneSize = 120
+	settingSiteFooterLinkURLMaxRuneSize  = 2000
 )
 
 // normalizeSettingValueByKey 按设置键执行归一化，避免非法值入库。
@@ -76,6 +80,7 @@ func normalizeSiteSetting(value map[string]interface{}) models.JSON {
 	normalized["legal"] = normalizeSiteLocalizedBlock(value["legal"], []string{"terms", "privacy"})
 	normalized["about"] = normalizeSiteAbout(value["about"])
 	normalized["scripts"] = normalizeSiteScripts(value["scripts"])
+	normalized["footer_links"] = normalizeSiteFooterLinks(value["footer_links"])
 	normalized[constants.SettingFieldSiteCurrency] = normalizeSiteCurrency(value[constants.SettingFieldSiteCurrency])
 
 	if raw, ok := value["languages"]; ok {
@@ -116,6 +121,39 @@ func normalizeSiteScripts(raw interface{}) []interface{} {
 		})
 
 		if len(result) >= settingSiteScriptsMaxCount {
+			break
+		}
+	}
+
+	return result
+}
+
+func normalizeSiteFooterLinks(raw interface{}) []interface{} {
+	listRaw, ok := raw.([]interface{})
+	if !ok {
+		return make([]interface{}, 0)
+	}
+
+	result := make([]interface{}, 0, len(listRaw))
+	for _, itemRaw := range listRaw {
+		itemMap, ok := itemRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name := normalizeSettingTextWithRuneLimit(itemMap["name"], settingSiteFooterLinkNameMaxRuneSize)
+		if name == "" {
+			continue
+		}
+
+		url := normalizeSettingTextWithRuneLimit(itemMap["url"], settingSiteFooterLinkURLMaxRuneSize)
+
+		result = append(result, map[string]interface{}{
+			"name": name,
+			"url":  url,
+		})
+
+		if len(result) >= settingSiteFooterLinksMaxCount {
 			break
 		}
 	}
