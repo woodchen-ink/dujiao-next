@@ -117,6 +117,7 @@ func AutoMigrate() error {
 		&DownstreamOrderRef{},
 		&ReconciliationJob{},
 		&ReconciliationItem{},
+		&ChannelClient{},
 	); err != nil {
 		return err
 	}

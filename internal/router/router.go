@@ -11,6 +11,7 @@ import (
 	"github.com/dujiao-next/internal/config"
 	"github.com/dujiao-next/internal/constants"
 	adminhandlers "github.com/dujiao-next/internal/http/handlers/admin"
+	channelhandlers "github.com/dujiao-next/internal/http/handlers/channel"
 	publichandlers "github.com/dujiao-next/internal/http/handlers/public"
 	upstreamhandlers "github.com/dujiao-next/internal/http/handlers/upstream"
 	"github.com/dujiao-next/internal/http/response"
@@ -31,6 +32,7 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 	// 初始化 Handler（按前台/后台分组）
 	publicHandler := publichandlers.New(c)
 	adminHandler := adminhandlers.New(c)
+	channelHandler := channelhandlers.New(c)
 	upstreamHandler := upstreamhandlers.New(c, c.DownstreamOrderRefRepo)
 	redisPrefix := strings.TrimSpace(cfg.Redis.Prefix)
 	if redisPrefix == "" {
@@ -167,6 +169,22 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 
 		// 上游回调接收（本站作为 A 站点，接收 B 的回调）
 		apiV1.POST("/upstream/callback", upstreamHandler.HandleCallback)
+
+		// 渠道 API（Telegram Bot 等外部服务调用）
+		channelAPI := apiV1.Group("/channel")
+		channelAPIRule := RateLimitRule{
+			Prefix:        fmt.Sprintf("%s:rate:channel_api", redisPrefix),
+			WindowSeconds: 60,
+			MaxRequests:   120,
+			BlockSeconds:  30,
+			MessageKey:    "error.rate_limited",
+		}
+		channelAPI.Use(ChannelAPIAuthMiddleware(c))
+		channelAPI.Use(RateLimitMiddleware(redisClient, channelAPIRule, KeyByChannelKey()))
+		{
+			channelAPI.GET("/telegram/config", channelHandler.GetBotConfig)
+			channelAPI.POST("/telegram/heartbeat", channelHandler.ReportHeartbeat)
+		}
 
 		apiV1.POST("/payments/callback", publicHandler.PaymentCallback)
 		apiV1.GET("/payments/callback", publicHandler.PaymentCallback)
@@ -354,6 +372,17 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 				authorized.GET("/reconciliation/jobs", adminHandler.GetReconciliationJobs)
 				authorized.GET("/reconciliation/jobs/:id", adminHandler.GetReconciliationJob)
 				authorized.PUT("/reconciliation/items/:id/resolve", adminHandler.ResolveReconciliationItem)
+
+				// 渠道客户端管理
+				authorized.GET("/channel-clients", adminHandler.ListChannelClients)
+				authorized.POST("/channel-clients", adminHandler.CreateChannelClient)
+				authorized.GET("/channel-clients/:id", adminHandler.GetChannelClient)
+				authorized.PUT("/channel-clients/:id/status", adminHandler.UpdateChannelClientStatus)
+
+				// Telegram Bot 设置
+				authorized.GET("/settings/telegram-bot", adminHandler.GetTelegramBotConfig)
+				authorized.PUT("/settings/telegram-bot", adminHandler.UpdateTelegramBotConfig)
+				authorized.GET("/settings/telegram-bot/runtime-status", adminHandler.GetTelegramBotRuntimeStatus)
 			}
 		}
 	}

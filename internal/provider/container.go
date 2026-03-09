@@ -51,6 +51,7 @@ type Container struct {
 	DownstreamOrderRefRepo repository.DownstreamOrderRefRepository
 	ReconciliationJobRepo  repository.ReconciliationJobRepository
 	ReconciliationItemRepo repository.ReconciliationItemRepository
+	ChannelClientRepo      repository.ChannelClientRepository
 
 	// Services
 	AuthzService              *authz.Service
@@ -85,6 +86,7 @@ type Container struct {
 	ProcurementOrderService   *service.ProcurementOrderService
 	DownstreamCallbackService *service.DownstreamCallbackService
 	ReconciliationService     *service.ReconciliationService
+	ChannelClientService      *service.ChannelClientService
 }
 
 // NewContainer 初始化容器
@@ -155,6 +157,7 @@ func (c *Container) initRepositories() {
 	c.DownstreamOrderRefRepo = repository.NewDownstreamOrderRefRepository(db)
 	c.ReconciliationJobRepo = repository.NewReconciliationJobRepository(db)
 	c.ReconciliationItemRepo = repository.NewReconciliationItemRepository(db)
+	c.ChannelClientRepo = repository.NewChannelClientRepository(db)
 }
 
 func (c *Container) initServices() {
@@ -253,6 +256,7 @@ func (c *Container) initServices() {
 		c.ReconciliationJobRepo, c.ReconciliationItemRepo, c.ProcurementOrderRepo,
 		c.SiteConnectionService, c.QueueClient, c.NotificationService,
 	)
+	c.ChannelClientService = service.NewChannelClientService(c.ChannelClientRepo, c.Config.App.SecretKey)
 	c.PaymentService.SetProcurementService(c.ProcurementOrderService)
 	c.PaymentService.SetDownstreamCallbackService(c.DownstreamCallbackService)
 	c.FulfillmentService.SetDownstreamCallbackService(c.DownstreamCallbackService)

@@ -360,6 +360,8 @@ const (
 	SettingKeyDashboardConfig          = "dashboard_config"
 	SettingKeyNotificationCenterConfig = "notification_center_config"
 	SettingKeyAffiliateConfig          = "affiliate_config"
+	SettingKeyTelegramBotConfig        = "telegram_bot_config"
+	SettingKeyTelegramBotRuntimeStatus = "telegram_bot_runtime_status"
 	SettingFieldSiteCurrency           = "currency"
 	SettingFieldPaymentExpireMinutes   = "payment_expire_minutes"
 )
