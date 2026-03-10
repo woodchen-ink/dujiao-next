@@ -107,6 +107,9 @@ func TestBuildChannelOrderDetailResponseUsesTotalPaidAmount(t *testing.T) {
 	if got := resp["item_count"]; got != 1 {
 		t.Fatalf("expected item_count=1, got=%v", got)
 	}
+	if got := resp["fulfillment_type"]; got != "manual" {
+		t.Fatalf("expected fulfillment_type=manual, got=%v", got)
+	}
 	items, ok := resp["items"].([]gin.H)
 	if !ok || len(items) != 1 {
 		t.Fatalf("expected single order item, got=%T len=%d", resp["items"], len(items))

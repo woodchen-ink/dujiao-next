@@ -172,15 +172,7 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 
 		// 渠道 API（Telegram Bot 等外部服务调用）
 		channelAPI := apiV1.Group("/channel")
-		channelAPIRule := RateLimitRule{
-			Prefix:        fmt.Sprintf("%s:rate:channel_api", redisPrefix),
-			WindowSeconds: 60,
-			MaxRequests:   120,
-			BlockSeconds:  30,
-			MessageKey:    "error.rate_limited",
-		}
 		channelAPI.Use(ChannelAPIAuthMiddleware(c))
-		channelAPI.Use(RateLimitMiddleware(redisClient, channelAPIRule, KeyByChannelKey()))
 		{
 			channelAPI.GET("/telegram/config", channelHandler.GetBotConfig)
 			channelAPI.POST("/telegram/heartbeat", channelHandler.ReportHeartbeat)

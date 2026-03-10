@@ -19,14 +19,18 @@ const (
 	channelClientIDKey = "channel_client_id"
 	channelKeyCtxKey   = "channel_key"
 	channelTypeCtxKey  = "channel_type"
+
+	channelHeaderKey       = "Dujiao-Next-Channel-Key"
+	channelHeaderTimestamp = "Dujiao-Next-Channel-Timestamp"
+	channelHeaderSignature = "Dujiao-Next-Channel-Signature"
 )
 
 // ChannelAPIAuthMiddleware 渠道 API 签名鉴权中间件
 func ChannelAPIAuthMiddleware(container *provider.Container) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		channelKey := c.GetHeader("X-Channel-Key")
-		timestampStr := c.GetHeader("X-Channel-Timestamp")
-		signature := c.GetHeader("X-Channel-Signature")
+		channelKey := c.GetHeader(channelHeaderKey)
+		timestampStr := c.GetHeader(channelHeaderTimestamp)
+		signature := c.GetHeader(channelHeaderSignature)
 
 		if channelKey == "" || timestampStr == "" || signature == "" {
 			response.ChannelError(c, http.StatusUnauthorized, response.CodeUnauthorized, i18n.T(i18n.ResolveLocale(c), "error.unauthorized"), "channel_client_unauthorized")
@@ -93,16 +97,5 @@ func ChannelAPIAuthMiddleware(container *provider.Container) gin.HandlerFunc {
 		c.Set(channelTypeCtxKey, client.ChannelType)
 
 		c.Next()
-	}
-}
-
-// KeyByChannelKey 按 channel key 限流
-func KeyByChannelKey() RateLimitKeyFunc {
-	return func(c *gin.Context) string {
-		key := c.GetHeader("X-Channel-Key")
-		if key != "" {
-			return key
-		}
-		return c.ClientIP()
 	}
 }

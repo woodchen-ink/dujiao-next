@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/dujiao-next/internal/logger"
 	"github.com/dujiao-next/internal/models"
@@ -196,17 +197,104 @@ func (h *Handler) GetProductDetail(c *gin.Context) {
 	}
 
 	respondChannelSuccess(c, gin.H{
-		"id":               product.ID,
-		"title":            title,
-		"description":      description,
-		"image_url":        imageURL,
-		"price_from":       product.PriceAmount.String(),
-		"currency":         currency,
-		"stock_status":     computeStockStatus(product.FulfillmentType, product.AutoStockAvailable, product.ManualStockTotal),
-		"category_name":    resolveLocalizedJSON(product.Category.NameJSON, locale, defaultLocale),
-		"fulfillment_type": product.FulfillmentType,
-		"skus":             skus,
+		"id":                 product.ID,
+		"title":              title,
+		"description":        description,
+		"image_url":          imageURL,
+		"price_from":         product.PriceAmount.String(),
+		"currency":           currency,
+		"stock_status":       computeStockStatus(product.FulfillmentType, product.AutoStockAvailable, product.ManualStockTotal),
+		"category_name":      resolveLocalizedJSON(product.Category.NameJSON, locale, defaultLocale),
+		"fulfillment_type":   product.FulfillmentType,
+		"manual_form_schema": normalizeChannelManualFormSchema(product.ManualFormSchemaJSON, locale, defaultLocale),
+		"purchase_note":      "",
+		"skus":               skus,
 	})
+}
+
+func normalizeChannelManualFormSchema(schema models.JSON, locale, defaultLocale string) gin.H {
+	fieldsRaw, ok := schema["fields"]
+	if !ok {
+		return gin.H{"fields": []gin.H{}}
+	}
+
+	fieldList, ok := fieldsRaw.([]interface{})
+	if !ok {
+		return gin.H{"fields": []gin.H{}}
+	}
+
+	fields := make([]gin.H, 0, len(fieldList))
+	for _, rawField := range fieldList {
+		fieldMap, ok := rawField.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		field := gin.H{}
+		if key, ok := fieldMap["key"].(string); ok {
+			field["key"] = key
+		}
+		if typeValue, ok := fieldMap["type"].(string); ok {
+			field["type"] = typeValue
+		}
+		if required, ok := fieldMap["required"].(bool); ok {
+			field["required"] = required
+		}
+		if label := localizedFieldText(fieldMap["label"], locale, defaultLocale); label != "" {
+			field["label"] = label
+		}
+		if placeholder := localizedFieldText(fieldMap["placeholder"], locale, defaultLocale); placeholder != "" {
+			field["placeholder"] = placeholder
+		}
+		if regex, ok := fieldMap["regex"].(string); ok && strings.TrimSpace(regex) != "" {
+			field["regex"] = regex
+		}
+		if minValue, ok := fieldMap["min"]; ok {
+			field["min"] = minValue
+		}
+		if maxValue, ok := fieldMap["max"]; ok {
+			field["max"] = maxValue
+		}
+		if maxLen, ok := fieldMap["max_len"]; ok {
+			field["max_len"] = maxLen
+		}
+		if options, ok := fieldMap["options"].([]string); ok {
+			field["options"] = options
+		} else if optionsRaw, ok := fieldMap["options"].([]interface{}); ok {
+			options := make([]string, 0, len(optionsRaw))
+			for _, rawOption := range optionsRaw {
+				option := strings.TrimSpace(fmt.Sprintf("%v", rawOption))
+				if option == "" || option == "<nil>" {
+					continue
+				}
+				options = append(options, option)
+			}
+			if len(options) > 0 {
+				field["options"] = options
+			}
+		}
+
+		fields = append(fields, field)
+	}
+
+	return gin.H{"fields": fields}
+}
+
+func localizedFieldText(raw interface{}, locale, defaultLocale string) string {
+	switch value := raw.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case models.JSON:
+		return strings.TrimSpace(resolveLocalizedJSON(value, locale, defaultLocale))
+	case map[string]interface{}:
+		return strings.TrimSpace(resolveLocalizedJSON(models.JSON(value), locale, defaultLocale))
+	default:
+		text := strings.TrimSpace(fmt.Sprintf("%v", raw))
+		if text == "<nil>" {
+			return ""
+		}
+		return text
+	}
 }
 
 // computeStockCount 计算可用库存数量（-1 表示无限库存）

@@ -181,6 +181,7 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 		"order_id":           order.ID,
 		"order_no":           order.OrderNo,
 		"status":             order.Status,
+		"fulfillment_type":   channelOrderFulfillmentType(order),
 		"currency":           order.Currency,
 		"item_count":         len(order.Items),
 		"original_amount":    order.OriginalAmount.StringFixed(2),
@@ -659,6 +660,7 @@ func buildChannelOrderDetailResponse(order *models.Order, locale string) gin.H {
 		"order_id":           order.ID,
 		"order_no":           order.OrderNo,
 		"status":             order.Status,
+		"fulfillment_type":   channelOrderFulfillmentType(order),
 		"currency":           order.Currency,
 		"item_count":         len(order.Items),
 		"original_amount":    order.OriginalAmount.StringFixed(2),
@@ -725,6 +727,35 @@ func buildChannelOrderDetailResponse(order *models.Order, locale string) gin.H {
 	}
 
 	return resp
+}
+
+func channelOrderFulfillmentType(order *models.Order) string {
+	if order == nil {
+		return ""
+	}
+	if order.Fulfillment != nil {
+		if fulfillmentType := strings.TrimSpace(order.Fulfillment.Type); fulfillmentType != "" {
+			return fulfillmentType
+		}
+	}
+	for _, item := range order.Items {
+		if fulfillmentType := strings.TrimSpace(item.FulfillmentType); fulfillmentType != "" {
+			return fulfillmentType
+		}
+	}
+	for _, child := range order.Children {
+		if child.Fulfillment != nil {
+			if fulfillmentType := strings.TrimSpace(child.Fulfillment.Type); fulfillmentType != "" {
+				return fulfillmentType
+			}
+		}
+		for _, item := range child.Items {
+			if fulfillmentType := strings.TrimSpace(item.FulfillmentType); fulfillmentType != "" {
+				return fulfillmentType
+			}
+		}
+	}
+	return ""
 }
 
 func buildChannelPaymentResponse(order *models.Order, payment *models.Payment) gin.H {
