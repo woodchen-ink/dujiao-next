@@ -41,6 +41,7 @@ type CreateProductInput struct {
 	Images               []string
 	Tags                 []string
 	PurchaseType         string
+	MaxPurchaseQuantity  *int
 	FulfillmentType      string
 	ManualStockTotal     *int
 	SKUs                 []ProductSKUInput
@@ -150,6 +151,10 @@ func (s *ProductService) Create(input CreateProductInput) (*models.Product, erro
 	if manualStockTotal < constants.ManualStockUnlimited {
 		return nil, ErrManualStockInvalid
 	}
+	maxPurchaseQuantity := 0
+	if input.MaxPurchaseQuantity != nil {
+		maxPurchaseQuantity = normalizeMaxPurchaseQuantity(*input.MaxPurchaseQuantity)
+	}
 
 	var normalizedSKUs []normalizedProductSKU
 	if len(input.SKUs) > 0 {
@@ -175,6 +180,7 @@ func (s *ProductService) Create(input CreateProductInput) (*models.Product, erro
 		Images:               models.StringArray(input.Images),
 		Tags:                 models.StringArray(input.Tags),
 		PurchaseType:         purchaseType,
+		MaxPurchaseQuantity:  maxPurchaseQuantity,
 		FulfillmentType:      fulfillmentType,
 		ManualStockTotal:     manualStockTotal,
 		ManualStockLocked:    0,
@@ -258,6 +264,9 @@ func (s *ProductService) Update(id string, input CreateProductInput) (*models.Pr
 		return nil, ErrProductPurchaseInvalid
 	}
 	product.PurchaseType = purchaseType
+	if input.MaxPurchaseQuantity != nil {
+		product.MaxPurchaseQuantity = normalizeMaxPurchaseQuantity(*input.MaxPurchaseQuantity)
+	}
 	rawFulfillmentType := strings.TrimSpace(input.FulfillmentType)
 	if rawFulfillmentType == "" {
 		rawFulfillmentType = product.FulfillmentType

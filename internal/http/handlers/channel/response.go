@@ -28,6 +28,7 @@ var channelOrderCreateErrorRules = []mappedChannelError{
 	{target: service.ErrInvalidOrderItem, httpCode: http.StatusBadRequest, code: response.CodeBadRequest, errorCode: "validation_error", key: "error.order_item_invalid"},
 	{target: service.ErrInvalidOrderAmount, httpCode: http.StatusBadRequest, code: response.CodeBadRequest, errorCode: "validation_error", key: "error.order_amount_invalid"},
 	{target: service.ErrProductPurchaseNotAllowed, httpCode: http.StatusBadRequest, code: response.CodeBadRequest, errorCode: "product_unavailable", key: "error.product_purchase_not_allowed"},
+	{target: service.ErrProductMaxPurchaseExceeded, httpCode: http.StatusBadRequest, code: response.CodeBadRequest, errorCode: "quantity_limit_exceeded", key: "error.product_max_purchase_exceeded"},
 	{target: service.ErrProductNotAvailable, httpCode: http.StatusBadRequest, code: response.CodeBadRequest, errorCode: "product_unavailable", key: "error.product_not_available"},
 	{target: service.ErrManualStockInsufficient, httpCode: http.StatusBadRequest, code: response.CodeBadRequest, errorCode: "sku_out_of_stock", key: "error.manual_stock_insufficient"},
 	{target: service.ErrCardSecretInsufficient, httpCode: http.StatusBadRequest, code: response.CodeBadRequest, errorCode: "sku_out_of_stock", key: "error.card_secret_insufficient"},

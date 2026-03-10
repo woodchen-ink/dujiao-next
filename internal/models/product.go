@@ -19,6 +19,7 @@ type Product struct {
 	Images               StringArray    `gorm:"type:json" json:"images"`                                            // 图片数组
 	Tags                 StringArray    `gorm:"type:json" json:"tags"`                                              // 标签数组
 	PurchaseType         string         `gorm:"type:varchar(20);not null;default:'member'" json:"purchase_type"`    // 购买身份（guest/member）
+	MaxPurchaseQuantity  int            `gorm:"not null;default:0" json:"max_purchase_quantity"`                    // 单次最大购买数量（0 表示不限制）
 	FulfillmentType      string         `gorm:"type:varchar(20);not null;default:'manual'" json:"fulfillment_type"` // 交付类型（auto/manual）
 	ManualFormSchemaJSON JSON           `gorm:"type:json" json:"manual_form_schema"`                                // 人工交付表单 schema
 	ManualStockTotal     int            `gorm:"not null;default:0" json:"manual_stock_total"`                       // 手动剩余库存（-1 表示无限库存，>=0 表示当前可售数量）

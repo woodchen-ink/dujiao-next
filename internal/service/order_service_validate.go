@@ -59,6 +59,9 @@ func (s *OrderService) buildOrderResult(input orderCreateParams) (*orderBuildRes
 		if product == nil || !product.IsActive {
 			return nil, ErrProductNotAvailable
 		}
+		if err := validateProductPurchaseQuantity(product, item.Quantity); err != nil {
+			return nil, err
+		}
 		purchaseType := strings.TrimSpace(product.PurchaseType)
 		if purchaseType == "" {
 			purchaseType = constants.ProductPurchaseMember

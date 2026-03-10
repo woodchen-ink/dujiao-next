@@ -197,18 +197,20 @@ func (h *Handler) GetProductDetail(c *gin.Context) {
 	}
 
 	respondChannelSuccess(c, gin.H{
-		"id":                 product.ID,
-		"title":              title,
-		"description":        description,
-		"image_url":          imageURL,
-		"price_from":         product.PriceAmount.String(),
-		"currency":           currency,
-		"stock_status":       computeStockStatus(product.FulfillmentType, product.AutoStockAvailable, product.ManualStockTotal),
-		"category_name":      resolveLocalizedJSON(product.Category.NameJSON, locale, defaultLocale),
-		"fulfillment_type":   product.FulfillmentType,
-		"manual_form_schema": normalizeChannelManualFormSchema(product.ManualFormSchemaJSON, locale, defaultLocale),
-		"purchase_note":      "",
-		"skus":               skus,
+		"id":                    product.ID,
+		"title":                 title,
+		"description":           description,
+		"image_url":             imageURL,
+		"price_from":            product.PriceAmount.String(),
+		"currency":              currency,
+		"stock_status":          computeStockStatus(product.FulfillmentType, product.AutoStockAvailable, product.ManualStockTotal),
+		"stock_count":           computeStockCount(product.FulfillmentType, product.AutoStockAvailable, product.ManualStockTotal),
+		"category_name":         resolveLocalizedJSON(product.Category.NameJSON, locale, defaultLocale),
+		"fulfillment_type":      product.FulfillmentType,
+		"max_purchase_quantity": normalizeChannelMaxPurchaseQuantity(product.MaxPurchaseQuantity),
+		"manual_form_schema":    normalizeChannelManualFormSchema(product.ManualFormSchemaJSON, locale, defaultLocale),
+		"purchase_note":         "",
+		"skus":                  skus,
 	})
 }
 
@@ -304,6 +306,13 @@ func computeStockCount(fulfillmentType string, autoStockAvailable int64, manualS
 	}
 	// manual: -1 表示无限库存
 	return int64(manualStockTotal)
+}
+
+func normalizeChannelMaxPurchaseQuantity(value int) int {
+	if value <= 0 {
+		return 0
+	}
+	return value
 }
 
 // computeStockStatus 计算库存状态

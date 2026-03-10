@@ -241,6 +241,80 @@ func TestBuildOrderResultRejectsZeroPromotionPrice(t *testing.T) {
 	}
 }
 
+func TestBuildOrderResultRejectsProductMaxPurchaseQuantityExceeded(t *testing.T) {
+	dsn := fmt.Sprintf("file:order_service_purchase_limit_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite failed: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Category{}, &models.Product{}, &models.ProductSKU{}, &models.Promotion{}); err != nil {
+		t.Fatalf("auto migrate failed: %v", err)
+	}
+
+	now := time.Now()
+	category := models.Category{
+		Slug:      "test-category-limit",
+		NameJSON:  models.JSON{"zh-CN": "测试分类"},
+		SortOrder: 0,
+		CreatedAt: now,
+	}
+	if err := db.Create(&category).Error; err != nil {
+		t.Fatalf("create category failed: %v", err)
+	}
+
+	product := models.Product{
+		CategoryID:          category.ID,
+		Slug:                "test-product-limit",
+		TitleJSON:           models.JSON{"zh-CN": "测试商品"},
+		PriceAmount:         models.NewMoneyFromDecimal(decimal.NewFromInt(10)),
+		PurchaseType:        constants.ProductPurchaseMember,
+		FulfillmentType:     constants.FulfillmentTypeManual,
+		MaxPurchaseQuantity: 2,
+		IsActive:            true,
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+	if err := db.Create(&product).Error; err != nil {
+		t.Fatalf("create product failed: %v", err)
+	}
+
+	sku := models.ProductSKU{
+		ProductID:         product.ID,
+		SKUCode:           models.DefaultSKUCode,
+		PriceAmount:       models.NewMoneyFromDecimal(decimal.NewFromInt(10)),
+		IsActive:          true,
+		ManualStockTotal:  constants.ManualStockUnlimited,
+		ManualStockLocked: 0,
+		ManualStockSold:   0,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	if err := db.Create(&sku).Error; err != nil {
+		t.Fatalf("create sku failed: %v", err)
+	}
+
+	svc := NewOrderService(OrderServiceOptions{
+		ProductRepo:    repository.NewProductRepository(db),
+		ProductSKURepo: repository.NewProductSKURepository(db),
+		PromotionRepo:  repository.NewPromotionRepository(db),
+		ExpireMinutes:  15,
+	})
+
+	_, err = svc.buildOrderResult(orderCreateParams{
+		UserID: 1,
+		Items: []CreateOrderItem{
+			{
+				ProductID: product.ID,
+				SKUID:     sku.ID,
+				Quantity:  3,
+			},
+		},
+	})
+	if !errors.Is(err, ErrProductMaxPurchaseExceeded) {
+		t.Fatalf("expected product max purchase exceeded, got: %v", err)
+	}
+}
+
 func TestBuildOrderResultOriginalAmountBeforePromotion(t *testing.T) {
 	dsn := fmt.Sprintf("file:order_service_promo_original_%d?mode=memory&cache=shared", time.Now().UnixNano())
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})

@@ -12,13 +12,12 @@ type LocalizedText map[string]string
 
 // TelegramBotConfigSetting Telegram Bot 配置实体（嵌套分组）
 type TelegramBotConfigSetting struct {
-	Enabled             bool                     `json:"enabled"`
-	DefaultLocale       string                   `json:"default_locale"`
-	ConfigVersion       int                      `json:"config_version"`
-	MaxPurchaseQuantity int                      `json:"max_purchase_quantity"`
-	Basic               TelegramBotBasicConfig   `json:"basic"`
-	Welcome             TelegramBotWelcomeConfig `json:"welcome"`
-	Menu                TelegramBotMenuConfig    `json:"menu"`
+	Enabled       bool                     `json:"enabled"`
+	DefaultLocale string                   `json:"default_locale"`
+	ConfigVersion int                      `json:"config_version"`
+	Basic         TelegramBotBasicConfig   `json:"basic"`
+	Welcome       TelegramBotWelcomeConfig `json:"welcome"`
+	Menu          TelegramBotMenuConfig    `json:"menu"`
 }
 
 // TelegramBotBasicConfig 基本信息分组
@@ -68,10 +67,9 @@ type TelegramBotRuntimeStatusSetting struct {
 // TelegramBotConfigDefault 默认 Bot 配置
 func TelegramBotConfigDefault() TelegramBotConfigSetting {
 	return TelegramBotConfigSetting{
-		Enabled:             false,
-		DefaultLocale:       "zh-CN",
-		ConfigVersion:       0,
-		MaxPurchaseQuantity: 10,
+		Enabled:       false,
+		DefaultLocale: "zh-CN",
+		ConfigVersion: 0,
 		Basic: TelegramBotBasicConfig{
 			Description: make(LocalizedText),
 		},
@@ -112,10 +110,9 @@ func TelegramBotRuntimeStatusDefault() TelegramBotRuntimeStatusSetting {
 // TelegramBotConfigToMap 转换为 settings 存储结构
 func TelegramBotConfigToMap(setting TelegramBotConfigSetting) map[string]interface{} {
 	return map[string]interface{}{
-		"enabled":               setting.Enabled,
-		"default_locale":        strings.TrimSpace(setting.DefaultLocale),
-		"config_version":        setting.ConfigVersion,
-		"max_purchase_quantity": setting.MaxPurchaseQuantity,
+		"enabled":        setting.Enabled,
+		"default_locale": strings.TrimSpace(setting.DefaultLocale),
+		"config_version": setting.ConfigVersion,
 		"basic": map[string]interface{}{
 			"display_name": strings.TrimSpace(setting.Basic.DisplayName),
 			"description":  localizedTextToMap(setting.Basic.Description),
@@ -135,10 +132,9 @@ func TelegramBotConfigToMap(setting TelegramBotConfigSetting) map[string]interfa
 // MaskTelegramBotConfigForAdmin 返回管理端配置
 func MaskTelegramBotConfigForAdmin(setting TelegramBotConfigSetting) models.JSON {
 	return models.JSON{
-		"enabled":               setting.Enabled,
-		"default_locale":        setting.DefaultLocale,
-		"config_version":        setting.ConfigVersion,
-		"max_purchase_quantity": setting.MaxPurchaseQuantity,
+		"enabled":        setting.Enabled,
+		"default_locale": setting.DefaultLocale,
+		"config_version": setting.ConfigVersion,
 		"basic": map[string]interface{}{
 			"display_name": setting.Basic.DisplayName,
 			"description":  localizedTextToMap(setting.Basic.Description),
@@ -158,11 +154,10 @@ func MaskTelegramBotConfigForAdmin(setting TelegramBotConfigSetting) models.JSON
 // SerializeTelegramBotConfigForChannel 返回 Channel API 配置（bot_token 由调用方注入）
 func SerializeTelegramBotConfigForChannel(setting TelegramBotConfigSetting, botToken string) models.JSON {
 	return models.JSON{
-		"enabled":               setting.Enabled,
-		"bot_token":             botToken,
-		"default_locale":        setting.DefaultLocale,
-		"config_version":        setting.ConfigVersion,
-		"max_purchase_quantity": setting.MaxPurchaseQuantity,
+		"enabled":        setting.Enabled,
+		"bot_token":      botToken,
+		"default_locale": setting.DefaultLocale,
+		"config_version": setting.ConfigVersion,
 		"basic": map[string]interface{}{
 			"display_name": setting.Basic.DisplayName,
 			"description":  localizedTextToMap(setting.Basic.Description),
@@ -217,7 +212,6 @@ func telegramBotConfigFromJSON(raw models.JSON, fallback TelegramBotConfigSettin
 	next.Enabled = readBool(raw, "enabled", next.Enabled)
 	next.DefaultLocale = readString(raw, "default_locale", next.DefaultLocale)
 	next.ConfigVersion = readInt(raw, "config_version", next.ConfigVersion)
-	next.MaxPurchaseQuantity = readInt(raw, "max_purchase_quantity", next.MaxPurchaseQuantity)
 
 	if basicRaw, ok := raw["basic"].(map[string]interface{}); ok {
 		next.Basic.DisplayName = readString(basicRaw, "display_name", next.Basic.DisplayName)

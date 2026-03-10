@@ -23,15 +23,16 @@ type CartItemRequest struct {
 
 // CartProduct 购物车商品摘要
 type CartProduct struct {
-	ID              uint               `json:"id"`
-	Slug            string             `json:"slug"`
-	Title           models.JSON        `json:"title"`
-	PriceAmount     models.Money       `json:"price_amount"`
-	Images          models.StringArray `json:"images"`
-	Tags            models.StringArray `json:"tags"`
-	PurchaseType    string             `json:"purchase_type"`
-	FulfillmentType string             `json:"fulfillment_type"`
-	IsActive        bool               `json:"is_active"`
+	ID                  uint               `json:"id"`
+	Slug                string             `json:"slug"`
+	Title               models.JSON        `json:"title"`
+	PriceAmount         models.Money       `json:"price_amount"`
+	Images              models.StringArray `json:"images"`
+	Tags                models.StringArray `json:"tags"`
+	PurchaseType        string             `json:"purchase_type"`
+	MaxPurchaseQuantity int                `json:"max_purchase_quantity"`
+	FulfillmentType     string             `json:"fulfillment_type"`
+	IsActive            bool               `json:"is_active"`
 }
 
 // CartItemResponse 购物车项响应
@@ -84,15 +85,16 @@ func (h *Handler) GetCart(c *gin.Context) {
 			cartFT = constants.FulfillmentTypeManual
 		}
 		product := CartProduct{
-			ID:              item.Product.ID,
-			Slug:            item.Product.Slug,
-			Title:           item.Product.TitleJSON,
-			PriceAmount:     item.Product.PriceAmount,
-			Images:          item.Product.Images,
-			Tags:            item.Product.Tags,
-			PurchaseType:    item.Product.PurchaseType,
-			FulfillmentType: productFT,
-			IsActive:        item.Product.IsActive,
+			ID:                  item.Product.ID,
+			Slug:                item.Product.Slug,
+			Title:               item.Product.TitleJSON,
+			PriceAmount:         item.Product.PriceAmount,
+			Images:              item.Product.Images,
+			Tags:                item.Product.Tags,
+			PurchaseType:        item.Product.PurchaseType,
+			MaxPurchaseQuantity: item.Product.MaxPurchaseQuantity,
+			FulfillmentType:     productFT,
+			IsActive:            item.Product.IsActive,
 		}
 		respItems = append(respItems, CartItemResponse{
 			ProductID:       item.ProductID,
@@ -142,6 +144,8 @@ func (h *Handler) UpsertCartItem(c *gin.Context) {
 			shared.RespondError(c, response.CodeBadRequest, "error.order_item_invalid", nil)
 		case errors.Is(err, service.ErrInvalidOrderItem):
 			shared.RespondError(c, response.CodeBadRequest, "error.order_item_invalid", nil)
+		case errors.Is(err, service.ErrProductMaxPurchaseExceeded):
+			shared.RespondError(c, response.CodeBadRequest, "error.product_max_purchase_exceeded", nil)
 		case errors.Is(err, service.ErrProductNotAvailable):
 			shared.RespondError(c, response.CodeBadRequest, "error.product_not_available", nil)
 		case errors.Is(err, service.ErrManualStockInsufficient):

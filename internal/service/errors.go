@@ -58,6 +58,7 @@ var (
 	ErrPromotionDeleteFailed           = errors.New("promotion delete failed")
 	ErrProductPriceInvalid             = errors.New("product price invalid")
 	ErrProductPurchaseInvalid          = errors.New("product purchase invalid")
+	ErrProductMaxPurchaseExceeded      = errors.New("product max purchase exceeded")
 	ErrManualStockInvalid              = errors.New("manual stock invalid")
 	ErrManualStockInsufficient         = errors.New("manual stock insufficient")
 	ErrManualFormSchemaInvalid         = errors.New("manual form schema invalid")

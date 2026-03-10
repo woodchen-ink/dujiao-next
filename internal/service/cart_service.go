@@ -143,6 +143,9 @@ func (s *CartService) UpsertItem(input UpsertCartItemInput) error {
 	if product == nil || !product.IsActive {
 		return ErrProductNotAvailable
 	}
+	if err := validateProductPurchaseQuantity(product, input.Quantity); err != nil {
+		return err
+	}
 	sku, err := s.resolveOrderSKU(product, input.SKUID)
 	if err != nil {
 		return err
