@@ -17,7 +17,7 @@ func (h *Handler) GetUserLoginLogs(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	page, pageSize = shared.NormalizePagination(page, pageSize)
 
-	userIDRaw := strings.TrimSpace(c.Query("user_id"))
+	userIDRaw := c.Query("user_id")
 	email := strings.TrimSpace(c.Query("email"))
 	status := strings.TrimSpace(c.Query("status"))
 	failReason := strings.TrimSpace(c.Query("fail_reason"))
@@ -27,12 +27,12 @@ func (h *Handler) GetUserLoginLogs(c *gin.Context) {
 
 	var userID uint
 	if userIDRaw != "" {
-		raw, err := strconv.ParseUint(userIDRaw, 10, 64)
+		parsedUserID, err := shared.ParseQueryUint(userIDRaw, false)
 		if err != nil {
 			shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 			return
 		}
-		userID = uint(raw)
+		userID = parsedUserID
 	}
 
 	createdFrom, err := shared.ParseTimeNullable(createdFromRaw)

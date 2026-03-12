@@ -18,10 +18,10 @@ func (h *Handler) GetProductMappings(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	page, pageSize = shared.NormalizePagination(page, pageSize)
 
-	connectionID, _ := strconv.ParseUint(c.Query("connection_id"), 10, 64)
+	connectionID, _ := shared.ParseQueryUint(c.Query("connection_id"), false)
 
 	mappings, total, err := h.ProductMappingService.List(repository.ProductMappingListFilter{
-		ConnectionID: uint(connectionID),
+		ConnectionID: connectionID,
 		Pagination: repository.Pagination{
 			Page:     page,
 			PageSize: pageSize,
@@ -38,13 +38,13 @@ func (h *Handler) GetProductMappings(c *gin.Context) {
 
 // GetProductMapping 获取商品映射详情
 func (h *Handler) GetProductMapping(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 
-	mapping, err := h.ProductMappingService.GetByID(uint(id))
+	mapping, err := h.ProductMappingService.GetByID(id)
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.mapping_fetch_failed", err)
 		return
@@ -166,13 +166,13 @@ func (h *Handler) BatchImportUpstreamProducts(c *gin.Context) {
 
 // SyncProductMapping 同步商品映射
 func (h *Handler) SyncProductMapping(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 
-	if err := h.ProductMappingService.SyncProduct(uint(id)); err != nil {
+	if err := h.ProductMappingService.SyncProduct(id); err != nil {
 		if errors.Is(err, service.ErrMappingNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.mapping_not_found", nil)
 			return
@@ -191,7 +191,7 @@ type UpdateProductMappingStatusRequest struct {
 
 // UpdateProductMappingStatus 启用/禁用映射
 func (h *Handler) UpdateProductMappingStatus(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
@@ -203,7 +203,7 @@ func (h *Handler) UpdateProductMappingStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.ProductMappingService.SetActive(uint(id), req.IsActive); err != nil {
+	if err := h.ProductMappingService.SetActive(id, req.IsActive); err != nil {
 		if errors.Is(err, service.ErrMappingNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.mapping_not_found", nil)
 			return
@@ -217,13 +217,13 @@ func (h *Handler) UpdateProductMappingStatus(c *gin.Context) {
 
 // DeleteProductMapping 删除映射
 func (h *Handler) DeleteProductMapping(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 
-	if err := h.ProductMappingService.Delete(uint(id)); err != nil {
+	if err := h.ProductMappingService.Delete(id); err != nil {
 		if errors.Is(err, service.ErrMappingNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.mapping_not_found", nil)
 			return
@@ -237,7 +237,7 @@ func (h *Handler) DeleteProductMapping(c *gin.Context) {
 
 // ListUpstreamProducts 代理拉取上游商品列表
 func (h *Handler) ListUpstreamProducts(c *gin.Context) {
-	connectionID, err := strconv.ParseUint(c.Query("connection_id"), 10, 64)
+	connectionID, err := shared.ParseQueryUint(c.Query("connection_id"), true)
 	if err != nil || connectionID == 0 {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
@@ -247,7 +247,7 @@ func (h *Handler) ListUpstreamProducts(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	page, pageSize = shared.NormalizePagination(page, pageSize)
 
-	result, err := h.ProductMappingService.ListUpstreamProducts(uint(connectionID), page, pageSize)
+	result, err := h.ProductMappingService.ListUpstreamProducts(connectionID, page, pageSize)
 	if err != nil {
 		if errors.Is(err, service.ErrConnectionNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.connection_not_found", nil)

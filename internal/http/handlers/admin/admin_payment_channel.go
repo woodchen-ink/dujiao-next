@@ -85,8 +85,8 @@ type UpdatePaymentChannelRequest struct {
 
 // UpdatePaymentChannel 更新支付渠道
 func (h *Handler) UpdatePaymentChannel(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
+	id, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.payment_channel_invalid", nil)
 		return
 	}
@@ -97,7 +97,7 @@ func (h *Handler) UpdatePaymentChannel(c *gin.Context) {
 		return
 	}
 
-	channel, err := h.PaymentService.GetChannel(uint(id))
+	channel, err := h.PaymentService.GetChannel(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrPaymentChannelNotFound):
@@ -156,13 +156,13 @@ func (h *Handler) UpdatePaymentChannel(c *gin.Context) {
 
 // DeletePaymentChannel 删除支付渠道
 func (h *Handler) DeletePaymentChannel(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
+	id, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.payment_channel_invalid", nil)
 		return
 	}
 
-	if err := h.PaymentChannelRepo.Delete(uint(id)); err != nil {
+	if err := h.PaymentChannelRepo.Delete(id); err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.payment_channel_delete_failed", err)
 		return
 	}
@@ -173,13 +173,13 @@ func (h *Handler) DeletePaymentChannel(c *gin.Context) {
 
 // GetPaymentChannel 获取支付渠道详情
 func (h *Handler) GetPaymentChannel(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
+	id, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.payment_channel_invalid", nil)
 		return
 	}
 
-	channel, err := h.PaymentService.GetChannel(uint(id))
+	channel, err := h.PaymentService.GetChannel(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrPaymentChannelNotFound):

@@ -153,12 +153,12 @@ func (h *Handler) CaptureMyWalletRechargePayment(c *gin.Context) {
 	if !ok {
 		return
 	}
-	paymentID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || paymentID == 0 {
+	paymentID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.payment_invalid", nil)
 		return
 	}
-	recharge, err := h.WalletService.GetRechargeOrderByPaymentIDAndUser(uint(paymentID), uid)
+	recharge, err := h.WalletService.GetRechargeOrderByPaymentIDAndUser(paymentID, uid)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrWalletRechargeNotFound):
@@ -169,7 +169,7 @@ func (h *Handler) CaptureMyWalletRechargePayment(c *gin.Context) {
 		return
 	}
 	updatedPayment, err := h.PaymentService.CapturePayment(service.CapturePaymentInput{
-		PaymentID: uint(paymentID),
+		PaymentID: paymentID,
 		Context:   c.Request.Context(),
 	})
 	if err != nil {
@@ -178,7 +178,7 @@ func (h *Handler) CaptureMyWalletRechargePayment(c *gin.Context) {
 			respondPaymentCaptureError(c, err)
 			return
 		}
-		updatedPayment, err = h.PaymentService.GetPayment(uint(paymentID))
+		updatedPayment, err = h.PaymentService.GetPayment(paymentID)
 		if err != nil {
 			respondPaymentCaptureError(c, err)
 			return

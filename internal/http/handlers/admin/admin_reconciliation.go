@@ -48,8 +48,8 @@ func (h *Handler) GetReconciliationJobs(c *gin.Context) {
 		Pagination: repository.Pagination{Page: page, PageSize: pageSize},
 	}
 	if connID := strings.TrimSpace(c.Query("connection_id")); connID != "" {
-		if id, err := strconv.ParseUint(connID, 10, 64); err == nil {
-			filter.ConnectionID = uint(id)
+		if id, err := shared.ParseQueryUint(connID, false); err == nil {
+			filter.ConnectionID = id
 		}
 	}
 	if status := strings.TrimSpace(c.Query("status")); status != "" {
@@ -74,13 +74,13 @@ func (h *Handler) GetReconciliationJob(c *gin.Context) {
 		shared.RespondErrorWithMsg(c, response.CodeInternal, "service not available", nil)
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 
-	job, err := h.ReconciliationService.GetJob(uint(id))
+	job, err := h.ReconciliationService.GetJob(id)
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.reconciliation_fetch_failed", err)
 		return
@@ -91,7 +91,7 @@ func (h *Handler) GetReconciliationJob(c *gin.Context) {
 	itemPageSize, _ := strconv.Atoi(c.DefaultQuery("items_page_size", "20"))
 	itemPage, itemPageSize = shared.NormalizePagination(itemPage, itemPageSize)
 
-	items, itemsTotal, err := h.ReconciliationService.GetJobItems(uint(id), itemPage, itemPageSize)
+	items, itemsTotal, err := h.ReconciliationService.GetJobItems(id, itemPage, itemPageSize)
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.reconciliation_fetch_failed", err)
 		return
@@ -110,7 +110,7 @@ func (h *Handler) ResolveReconciliationItem(c *gin.Context) {
 		shared.RespondErrorWithMsg(c, response.CodeInternal, "service not available", nil)
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
@@ -129,7 +129,7 @@ func (h *Handler) ResolveReconciliationItem(c *gin.Context) {
 		shared.RespondError(c, response.CodeUnauthorized, "error.unauthorized", nil)
 		return
 	}
-	if err := h.ReconciliationService.ResolveItem(uint(id), adminID, input.Remark); err != nil {
+	if err := h.ReconciliationService.ResolveItem(id, adminID, input.Remark); err != nil {
 		if errors.Is(err, service.ErrReconciliationItemNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.reconciliation_item_not_found", nil)
 			return

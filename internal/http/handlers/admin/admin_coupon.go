@@ -3,7 +3,6 @@ package admin
 import (
 	"errors"
 	"strconv"
-	"strings"
 
 	"github.com/dujiao-next/internal/http/handlers/shared"
 	"github.com/dujiao-next/internal/http/response"
@@ -79,8 +78,8 @@ func (h *Handler) CreateCoupon(c *gin.Context) {
 
 // UpdateCoupon 更新优惠券
 func (h *Handler) UpdateCoupon(c *gin.Context) {
-	couponID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || couponID == 0 {
+	couponID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
@@ -101,7 +100,7 @@ func (h *Handler) UpdateCoupon(c *gin.Context) {
 		return
 	}
 
-	coupon, err := h.CouponAdminService.Update(uint(couponID), service.UpdateCouponInput{
+	coupon, err := h.CouponAdminService.Update(couponID, service.UpdateCouponInput{
 		Code:         req.Code,
 		Type:         req.Type,
 		Value:        models.NewMoneyFromDecimal(decimal.NewFromFloat(req.Value)),
@@ -133,12 +132,12 @@ func (h *Handler) UpdateCoupon(c *gin.Context) {
 
 // DeleteCoupon 删除优惠券
 func (h *Handler) DeleteCoupon(c *gin.Context) {
-	couponID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || couponID == 0 {
+	couponID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
-	if err := h.CouponAdminService.Delete(uint(couponID)); err != nil {
+	if err := h.CouponAdminService.Delete(couponID); err != nil {
 		switch {
 		case errors.Is(err, service.ErrCouponNotFound):
 			shared.RespondError(c, response.CodeNotFound, "error.coupon_not_found", nil)
@@ -161,23 +160,15 @@ func (h *Handler) GetAdminCoupons(c *gin.Context) {
 	page, pageSize = shared.NormalizePagination(page, pageSize)
 
 	code := c.Query("code")
-	var id uint
-	if rawID := strings.TrimSpace(c.Query("id")); rawID != "" {
-		parsed, err := strconv.ParseUint(rawID, 10, 64)
-		if err != nil || parsed == 0 {
-			shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
-			return
-		}
-		id = uint(parsed)
+	id, err := shared.ParseQueryUint(c.Query("id"), true)
+	if err != nil {
+		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
+		return
 	}
-	var scopeRefID uint
-	if rawScopeRefID := strings.TrimSpace(c.Query("scope_ref_id")); rawScopeRefID != "" {
-		parsed, err := strconv.ParseUint(rawScopeRefID, 10, 64)
-		if err != nil || parsed == 0 {
-			shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
-			return
-		}
-		scopeRefID = uint(parsed)
+	scopeRefID, err := shared.ParseQueryUint(c.Query("scope_ref_id"), true)
+	if err != nil {
+		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
+		return
 	}
 	var isActive *bool
 	if raw := c.Query("is_active"); raw != "" {

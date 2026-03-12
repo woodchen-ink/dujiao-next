@@ -34,12 +34,12 @@ func (h *Handler) ListAffiliateUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	page, pageSize = shared.NormalizePagination(page, pageSize)
-	userID, _ := strconv.ParseUint(strings.TrimSpace(c.Query("user_id")), 10, 64)
+	userID, _ := shared.ParseQueryUint(c.Query("user_id"), false)
 
 	rows, total, err := h.AffiliateService.ListAdminUsers(repository.AffiliateProfileListFilter{
 		Page:     page,
 		PageSize: pageSize,
-		UserID:   uint(userID),
+		UserID:   userID,
 		Status:   strings.TrimSpace(c.Query("status")),
 		Code:     strings.TrimSpace(c.Query("code")),
 		Keyword:  strings.TrimSpace(c.Query("keyword")),
@@ -60,12 +60,12 @@ func (h *Handler) ListAffiliateCommissions(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	page, pageSize = shared.NormalizePagination(page, pageSize)
-	profileID, _ := strconv.ParseUint(strings.TrimSpace(c.Query("affiliate_profile_id")), 10, 64)
+	profileID, _ := shared.ParseQueryUint(c.Query("affiliate_profile_id"), false)
 
 	rows, total, err := h.AffiliateService.ListAdminCommissions(service.AffiliateAdminCommissionListFilter{
 		Page:               page,
 		PageSize:           pageSize,
-		AffiliateProfileID: uint(profileID),
+		AffiliateProfileID: profileID,
 		OrderNo:            strings.TrimSpace(c.Query("order_no")),
 		Status:             strings.TrimSpace(c.Query("status")),
 		Keyword:            strings.TrimSpace(c.Query("keyword")),
@@ -86,12 +86,12 @@ func (h *Handler) ListAffiliateWithdraws(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	page, pageSize = shared.NormalizePagination(page, pageSize)
-	profileID, _ := strconv.ParseUint(strings.TrimSpace(c.Query("affiliate_profile_id")), 10, 64)
+	profileID, _ := shared.ParseQueryUint(c.Query("affiliate_profile_id"), false)
 
 	rows, total, err := h.AffiliateService.ListAdminWithdraws(service.AffiliateAdminWithdrawListFilter{
 		Page:               page,
 		PageSize:           pageSize,
-		AffiliateProfileID: uint(profileID),
+		AffiliateProfileID: profileID,
 		Status:             strings.TrimSpace(c.Query("status")),
 		Keyword:            strings.TrimSpace(c.Query("keyword")),
 	})
@@ -108,8 +108,8 @@ func (h *Handler) UpdateAffiliateUserStatus(c *gin.Context) {
 		shared.RespondError(c, response.CodeInternal, "error.save_failed", nil)
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
+	id, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
 		return
 	}
@@ -120,7 +120,7 @@ func (h *Handler) UpdateAffiliateUserStatus(c *gin.Context) {
 		return
 	}
 
-	row, err := h.AffiliateService.UpdateAffiliateProfileStatus(uint(id), strings.TrimSpace(req.Status))
+	row, err := h.AffiliateService.UpdateAffiliateProfileStatus(id, strings.TrimSpace(req.Status))
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrNotFound):
@@ -178,8 +178,8 @@ func (h *Handler) RejectAffiliateWithdraw(c *gin.Context) {
 		shared.RespondError(c, response.CodeInternal, "error.save_failed", nil)
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
+	id, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
 		return
 	}
@@ -189,7 +189,7 @@ func (h *Handler) RejectAffiliateWithdraw(c *gin.Context) {
 		shared.RespondBindError(c, err)
 		return
 	}
-	row, err := h.AffiliateService.ReviewWithdraw(adminID, uint(id), constants.AffiliateWithdrawActionReject, req.Reason)
+	row, err := h.AffiliateService.ReviewWithdraw(adminID, id, constants.AffiliateWithdrawActionReject, req.Reason)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrNotFound):
@@ -214,12 +214,12 @@ func (h *Handler) PayAffiliateWithdraw(c *gin.Context) {
 		shared.RespondError(c, response.CodeInternal, "error.save_failed", nil)
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
+	id, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
 		return
 	}
-	row, err := h.AffiliateService.ReviewWithdraw(adminID, uint(id), constants.AffiliateWithdrawActionPay, "")
+	row, err := h.AffiliateService.ReviewWithdraw(adminID, id, constants.AffiliateWithdrawActionPay, "")
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrNotFound):

@@ -19,11 +19,11 @@ func (h *Handler) GetApiCredentials(c *gin.Context) {
 	page, pageSize = shared.NormalizePagination(page, pageSize)
 	status := c.Query("status")
 	search := c.Query("search")
-	userID, _ := strconv.ParseUint(c.Query("user_id"), 10, 64)
+	userID, _ := shared.ParseQueryUint(c.Query("user_id"), false)
 
 	creds, total, err := h.ApiCredentialService.List(repository.ApiCredentialListFilter{
 		Status: status,
-		UserID: uint(userID),
+		UserID: userID,
 		Search: search,
 		Pagination: repository.Pagination{
 			Page:     page,
@@ -41,13 +41,13 @@ func (h *Handler) GetApiCredentials(c *gin.Context) {
 
 // GetApiCredential 获取 API 凭证详情
 func (h *Handler) GetApiCredential(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 
-	cred, err := h.ApiCredentialService.GetByID(uint(id))
+	cred, err := h.ApiCredentialService.GetByID(id)
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.api_credential_fetch_failed", err)
 		return
@@ -62,13 +62,13 @@ func (h *Handler) GetApiCredential(c *gin.Context) {
 
 // ApproveApiCredential 审核通过 API 凭证
 func (h *Handler) ApproveApiCredential(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 
-	cred, _, err := h.ApiCredentialService.Approve(uint(id))
+	cred, _, err := h.ApiCredentialService.Approve(id)
 	if err != nil {
 		if errors.Is(err, service.ErrApiCredentialNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.api_credential_not_found", nil)
@@ -91,7 +91,7 @@ type RejectApiCredentialRequest struct {
 
 // RejectApiCredential 审核拒绝 API 凭证
 func (h *Handler) RejectApiCredential(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
@@ -103,7 +103,7 @@ func (h *Handler) RejectApiCredential(c *gin.Context) {
 		return
 	}
 
-	if err := h.ApiCredentialService.Reject(uint(id), req.Reason); err != nil {
+	if err := h.ApiCredentialService.Reject(id, req.Reason); err != nil {
 		if errors.Is(err, service.ErrApiCredentialNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.api_credential_not_found", nil)
 			return
@@ -122,7 +122,7 @@ type UpdateApiCredentialStatusRequest struct {
 
 // UpdateApiCredentialStatus 启用/禁用 API 凭证
 func (h *Handler) UpdateApiCredentialStatus(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
@@ -134,7 +134,7 @@ func (h *Handler) UpdateApiCredentialStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.ApiCredentialService.SetActive(uint(id), req.IsActive); err != nil {
+	if err := h.ApiCredentialService.SetActive(id, req.IsActive); err != nil {
 		if errors.Is(err, service.ErrApiCredentialNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.api_credential_not_found", nil)
 			return
@@ -152,13 +152,13 @@ func (h *Handler) UpdateApiCredentialStatus(c *gin.Context) {
 
 // DeleteApiCredential 删除 API 凭证
 func (h *Handler) DeleteApiCredential(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 
-	if err := h.ApiCredentialService.Delete(uint(id)); err != nil {
+	if err := h.ApiCredentialService.Delete(id); err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.api_credential_delete_failed", err)
 		return
 	}

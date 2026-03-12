@@ -3,7 +3,6 @@ package admin
 import (
 	"errors"
 	"strconv"
-	"strings"
 
 	"github.com/dujiao-next/internal/http/handlers/shared"
 	"github.com/dujiao-next/internal/http/response"
@@ -71,8 +70,8 @@ func (h *Handler) CreatePromotion(c *gin.Context) {
 
 // UpdatePromotion 更新活动价
 func (h *Handler) UpdatePromotion(c *gin.Context) {
-	promotionID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || promotionID == 0 {
+	promotionID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
@@ -93,7 +92,7 @@ func (h *Handler) UpdatePromotion(c *gin.Context) {
 		return
 	}
 
-	promotion, err := h.PromotionAdminService.Update(uint(promotionID), service.UpdatePromotionInput{
+	promotion, err := h.PromotionAdminService.Update(promotionID, service.UpdatePromotionInput{
 		Name:       req.Name,
 		Type:       req.Type,
 		ScopeRefID: req.ScopeRefID,
@@ -120,12 +119,12 @@ func (h *Handler) UpdatePromotion(c *gin.Context) {
 
 // DeletePromotion 删除活动价
 func (h *Handler) DeletePromotion(c *gin.Context) {
-	promotionID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || promotionID == 0 {
+	promotionID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
-	if err := h.PromotionAdminService.Delete(uint(promotionID)); err != nil {
+	if err := h.PromotionAdminService.Delete(promotionID); err != nil {
 		switch {
 		case errors.Is(err, service.ErrPromotionNotFound):
 			shared.RespondError(c, response.CodeNotFound, "error.promotion_not_found", nil)
@@ -147,17 +146,13 @@ func (h *Handler) GetAdminPromotions(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	page, pageSize = shared.NormalizePagination(page, pageSize)
 
-	var id uint
-	if rawID := strings.TrimSpace(c.Query("id")); rawID != "" {
-		parsed, err := strconv.ParseUint(rawID, 10, 64)
-		if err != nil || parsed == 0 {
-			shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
-			return
-		}
-		id = uint(parsed)
+	id, err := shared.ParseQueryUint(c.Query("id"), true)
+	if err != nil {
+		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
+		return
 	}
 
-	scopeRefID, _ := strconv.ParseUint(c.Query("scope_ref_id"), 10, 64)
+	scopeRefID, _ := shared.ParseQueryUint(c.Query("scope_ref_id"), false)
 
 	var isActive *bool
 	if raw := c.Query("is_active"); raw != "" {
@@ -171,7 +166,7 @@ func (h *Handler) GetAdminPromotions(c *gin.Context) {
 
 	promotions, total, err := h.PromotionAdminService.List(repository.PromotionListFilter{
 		ID:         id,
-		ScopeRefID: uint(scopeRefID),
+		ScopeRefID: scopeRefID,
 		IsActive:   isActive,
 		Page:       page,
 		PageSize:   pageSize,

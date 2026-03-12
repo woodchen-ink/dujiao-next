@@ -27,8 +27,8 @@ func (h *Handler) GetProcurementOrders(c *gin.Context) {
 		Pagination: repository.Pagination{Page: page, PageSize: pageSize},
 	}
 	if connID := strings.TrimSpace(c.Query("connection_id")); connID != "" {
-		if id, err := strconv.ParseUint(connID, 10, 64); err == nil {
-			filter.ConnectionID = uint(id)
+		if id, err := shared.ParseQueryUint(connID, false); err == nil {
+			filter.ConnectionID = id
 		}
 	}
 	if status := strings.TrimSpace(c.Query("status")); status != "" {
@@ -62,12 +62,12 @@ func (h *Handler) GetProcurementOrder(c *gin.Context) {
 		shared.RespondErrorWithMsg(c, response.CodeInternal, "service not available", nil)
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
-	order, err := h.ProcurementOrderService.GetByID(uint(id))
+	order, err := h.ProcurementOrderService.GetByID(id)
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.procurement_fetch_failed", err)
 		return
@@ -85,12 +85,12 @@ func (h *Handler) RetryProcurementOrder(c *gin.Context) {
 		shared.RespondErrorWithMsg(c, response.CodeInternal, "service not available", nil)
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
-	if err := h.ProcurementOrderService.RetryManual(uint(id)); err != nil {
+	if err := h.ProcurementOrderService.RetryManual(id); err != nil {
 		if errors.Is(err, service.ErrProcurementNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.procurement_not_found", nil)
 			return
@@ -111,12 +111,12 @@ func (h *Handler) CancelProcurementOrder(c *gin.Context) {
 		shared.RespondErrorWithMsg(c, response.CodeInternal, "service not available", nil)
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
-	if err := h.ProcurementOrderService.CancelManual(uint(id)); err != nil {
+	if err := h.ProcurementOrderService.CancelManual(id); err != nil {
 		if errors.Is(err, service.ErrProcurementNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.procurement_not_found", nil)
 			return

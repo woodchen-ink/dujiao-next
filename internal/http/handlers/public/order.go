@@ -152,13 +152,13 @@ func (h *Handler) GetOrder(c *gin.Context) {
 		return
 	}
 
-	orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || orderID == 0 {
+	orderID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.order_item_invalid", nil)
 		return
 	}
 
-	order, err := h.OrderService.GetOrderByUser(uint(orderID), uid)
+	order, err := h.OrderService.GetOrderByUser(orderID, uid)
 	if err != nil {
 		if errors.Is(err, service.ErrOrderNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.order_not_found", nil)
@@ -206,13 +206,13 @@ func (h *Handler) CancelOrder(c *gin.Context) {
 		return
 	}
 
-	orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || orderID == 0 {
+	orderID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.order_item_invalid", nil)
 		return
 	}
 
-	order, err := h.OrderService.CancelOrder(uint(orderID), uid)
+	order, err := h.OrderService.CancelOrder(orderID, uid)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrOrderNotFound):

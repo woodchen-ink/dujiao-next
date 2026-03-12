@@ -38,7 +38,7 @@ func (h *Handler) AdminListOrders(c *gin.Context) {
 	page, pageSize = shared.NormalizePagination(page, pageSize)
 
 	status := strings.TrimSpace(c.Query("status"))
-	userIDStr := strings.TrimSpace(c.Query("user_id"))
+	userIDRaw := c.Query("user_id")
 	userKeyword := strings.TrimSpace(c.Query("user_keyword"))
 	orderNo := strings.TrimSpace(c.Query("order_no"))
 	guestEmail := strings.TrimSpace(c.Query("guest_email"))
@@ -56,11 +56,7 @@ func (h *Handler) AdminListOrders(c *gin.Context) {
 		return
 	}
 	var userID uint
-	if userIDStr != "" {
-		if parsed, err := strconv.ParseUint(userIDStr, 10, 64); err == nil {
-			userID = uint(parsed)
-		}
-	}
+	userID, _ = shared.ParseQueryUint(userIDRaw, false)
 
 	orders, total, err := h.OrderService.ListOrdersForAdmin(repository.OrderListFilter{
 		Page:        page,
@@ -122,13 +118,13 @@ func (h *Handler) AdminListOrders(c *gin.Context) {
 
 // AdminGetOrder 管理端订单详情
 func (h *Handler) AdminGetOrder(c *gin.Context) {
-	orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || orderID == 0 {
+	orderID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.order_item_invalid", nil)
 		return
 	}
 
-	order, err := h.OrderService.GetOrderForAdmin(uint(orderID))
+	order, err := h.OrderService.GetOrderForAdmin(orderID)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrOrderNotFound):
@@ -269,8 +265,8 @@ type AdminUpdateOrderStatusRequest struct {
 
 // AdminUpdateOrderStatus 管理端更新订单状态
 func (h *Handler) AdminUpdateOrderStatus(c *gin.Context) {
-	orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || orderID == 0 {
+	orderID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.order_item_invalid", nil)
 		return
 	}
@@ -281,7 +277,7 @@ func (h *Handler) AdminUpdateOrderStatus(c *gin.Context) {
 		return
 	}
 
-	order, err := h.OrderService.UpdateOrderStatus(uint(orderID), req.Status)
+	order, err := h.OrderService.UpdateOrderStatus(orderID, req.Status)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrOrderNotFound):

@@ -17,8 +17,8 @@ func (h *Handler) ListAuthzAuditLogs(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	page, pageSize = shared.NormalizePagination(page, pageSize)
 
-	operatorAdminIDRaw := strings.TrimSpace(c.Query("operator_admin_id"))
-	targetAdminIDRaw := strings.TrimSpace(c.Query("target_admin_id"))
+	operatorAdminIDRaw := c.Query("operator_admin_id")
+	targetAdminIDRaw := c.Query("target_admin_id")
 	action := strings.TrimSpace(c.Query("action"))
 	role := strings.TrimSpace(c.Query("role"))
 	object := strings.TrimSpace(c.Query("object"))
@@ -28,22 +28,22 @@ func (h *Handler) ListAuthzAuditLogs(c *gin.Context) {
 
 	var operatorAdminID uint
 	if operatorAdminIDRaw != "" {
-		raw, err := strconv.ParseUint(operatorAdminIDRaw, 10, 64)
+		parsedOperatorAdminID, err := shared.ParseQueryUint(operatorAdminIDRaw, false)
 		if err != nil {
 			shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 			return
 		}
-		operatorAdminID = uint(raw)
+		operatorAdminID = parsedOperatorAdminID
 	}
 
 	var targetAdminID uint
 	if targetAdminIDRaw != "" {
-		raw, err := strconv.ParseUint(targetAdminIDRaw, 10, 64)
+		parsedTargetAdminID, err := shared.ParseQueryUint(targetAdminIDRaw, false)
 		if err != nil {
 			shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 			return
 		}
-		targetAdminID = uint(raw)
+		targetAdminID = parsedTargetAdminID
 	}
 
 	createdFrom, err := shared.ParseTimeNullable(createdFromRaw)

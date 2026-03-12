@@ -722,12 +722,12 @@ func (h *Handler) GetGuestOrder(c *gin.Context) {
 		shared.RespondError(c, response.CodeBadRequest, "error.guest_password_required", nil)
 		return
 	}
-	orderID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || orderID == 0 {
+	orderID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.order_item_invalid", nil)
 		return
 	}
-	order, err := h.OrderService.GetOrderByGuest(uint(orderID), email, password)
+	order, err := h.OrderService.GetOrderByGuest(orderID, email, password)
 	if err != nil {
 		if errors.Is(err, service.ErrGuestOrderNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.guest_order_not_found", nil)
@@ -845,8 +845,8 @@ type CaptureGuestPaymentRequest struct {
 
 // CaptureGuestPayment 游客捕获支付。
 func (h *Handler) CaptureGuestPayment(c *gin.Context) {
-	paymentID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || paymentID == 0 {
+	paymentID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.payment_invalid", nil)
 		return
 	}
@@ -866,7 +866,7 @@ func (h *Handler) CaptureGuestPayment(c *gin.Context) {
 		return
 	}
 
-	payment, err := h.PaymentService.GetPayment(uint(paymentID))
+	payment, err := h.PaymentService.GetPayment(paymentID)
 	if err != nil {
 		if errors.Is(err, service.ErrPaymentNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.payment_not_found", nil)
@@ -885,7 +885,7 @@ func (h *Handler) CaptureGuestPayment(c *gin.Context) {
 	}
 
 	updated, err := h.PaymentService.CapturePayment(service.CapturePaymentInput{
-		PaymentID: uint(paymentID),
+		PaymentID: paymentID,
 		Context:   c.Request.Context(),
 	})
 	if err != nil {

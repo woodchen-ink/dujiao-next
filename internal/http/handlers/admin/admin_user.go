@@ -153,13 +153,13 @@ func (h *Handler) GetAdminUsers(c *gin.Context) {
 
 // GetAdminUser 获取用户详情
 func (h *Handler) GetAdminUser(c *gin.Context) {
-	rawID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || rawID == 0 {
+	userID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.user_id_invalid", nil)
 		return
 	}
 
-	user, err := h.UserRepo.GetByID(uint(rawID))
+	user, err := h.UserRepo.GetByID(userID)
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.user_fetch_failed", err)
 		return
@@ -199,8 +199,8 @@ func (h *Handler) GetAdminUser(c *gin.Context) {
 
 // UpdateAdminUser 更新用户信息
 func (h *Handler) UpdateAdminUser(c *gin.Context) {
-	rawID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || rawID == 0 {
+	userID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.user_id_invalid", nil)
 		return
 	}
@@ -211,7 +211,7 @@ func (h *Handler) UpdateAdminUser(c *gin.Context) {
 		return
 	}
 
-	user, err := h.UserRepo.GetByID(uint(rawID))
+	user, err := h.UserRepo.GetByID(userID)
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.user_fetch_failed", err)
 		return
@@ -305,8 +305,8 @@ func (h *Handler) UpdateAdminUser(c *gin.Context) {
 
 // GetAdminUserCouponUsages 获取用户优惠券使用记录
 func (h *Handler) GetAdminUserCouponUsages(c *gin.Context) {
-	rawID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || rawID == 0 {
+	userID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.user_id_invalid", nil)
 		return
 	}
@@ -318,7 +318,7 @@ func (h *Handler) GetAdminUserCouponUsages(c *gin.Context) {
 	usages, total, err := h.CouponUsageRepo.ListByUser(repository.CouponUsageListFilter{
 		Page:     page,
 		PageSize: pageSize,
-		UserID:   uint(rawID),
+		UserID:   userID,
 	})
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.user_fetch_failed", err)

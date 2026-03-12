@@ -2,7 +2,6 @@ package public
 
 import (
 	"errors"
-	"strconv"
 
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/http/handlers/shared"
@@ -166,14 +165,17 @@ func (h *Handler) DeleteCartItem(c *gin.Context) {
 	if !ok {
 		return
 	}
-	rawID := c.Param("product_id")
-	productID, err := strconv.ParseUint(rawID, 10, 64)
-	if err != nil || productID == 0 {
+	productID, err := shared.ParseParamUint(c, "product_id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.order_item_invalid", nil)
 		return
 	}
-	skuID, _ := strconv.ParseUint(c.DefaultQuery("sku_id", "0"), 10, 64)
-	if err := h.CartService.RemoveItem(uid, uint(productID), uint(skuID)); err != nil {
+	skuID, err := shared.ParseQueryUint(c.DefaultQuery("sku_id", "0"), false)
+	if err != nil {
+		shared.RespondError(c, response.CodeBadRequest, "error.order_item_invalid", nil)
+		return
+	}
+	if err := h.CartService.RemoveItem(uid, productID, skuID); err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidOrderItem):
 			shared.RespondError(c, response.CodeBadRequest, "error.order_item_invalid", nil)

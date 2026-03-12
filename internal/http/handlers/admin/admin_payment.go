@@ -143,13 +143,13 @@ func (h *Handler) ExportAdminPayments(c *gin.Context) {
 
 // GetAdminPayment 获取支付记录详情
 func (h *Handler) GetAdminPayment(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
+	id, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.payment_invalid", nil)
 		return
 	}
 
-	payment, err := h.PaymentService.GetPayment(uint(id))
+	payment, err := h.PaymentService.GetPayment(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrPaymentNotFound):

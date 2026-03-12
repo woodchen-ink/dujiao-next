@@ -35,13 +35,13 @@ func (h *Handler) GetSiteConnections(c *gin.Context) {
 
 // GetSiteConnection 获取对接连接详情
 func (h *Handler) GetSiteConnection(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 
-	conn, err := h.SiteConnectionService.GetByID(uint(id))
+	conn, err := h.SiteConnectionService.GetByID(id)
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.connection_fetch_failed", err)
 		return
@@ -77,7 +77,7 @@ func (h *Handler) CreateSiteConnection(c *gin.Context) {
 
 // UpdateSiteConnection 更新对接连接
 func (h *Handler) UpdateSiteConnection(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
@@ -89,7 +89,7 @@ func (h *Handler) UpdateSiteConnection(c *gin.Context) {
 		return
 	}
 
-	conn, err := h.SiteConnectionService.Update(uint(id), input)
+	conn, err := h.SiteConnectionService.Update(id, input)
 	if err != nil {
 		if errors.Is(err, service.ErrConnectionNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.connection_not_found", nil)
@@ -104,13 +104,13 @@ func (h *Handler) UpdateSiteConnection(c *gin.Context) {
 
 // DeleteSiteConnection 删除对接连接
 func (h *Handler) DeleteSiteConnection(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 
-	if err := h.SiteConnectionService.Delete(uint(id)); err != nil {
+	if err := h.SiteConnectionService.Delete(id); err != nil {
 		if errors.Is(err, service.ErrConnectionNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.connection_not_found", nil)
 			return
@@ -124,13 +124,13 @@ func (h *Handler) DeleteSiteConnection(c *gin.Context) {
 
 // PingSiteConnection 测试对接连接
 func (h *Handler) PingSiteConnection(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 
-	result, err := h.SiteConnectionService.Ping(uint(id))
+	result, err := h.SiteConnectionService.Ping(id)
 	if err != nil {
 		if errors.Is(err, service.ErrConnectionNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.connection_not_found", nil)
@@ -150,7 +150,7 @@ type UpdateSiteConnectionStatusRequest struct {
 
 // UpdateSiteConnectionStatus 更新连接状态
 func (h *Handler) UpdateSiteConnectionStatus(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := shared.ParseParamUint(c, "id")
 	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
@@ -162,7 +162,7 @@ func (h *Handler) UpdateSiteConnectionStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.SiteConnectionService.SetStatus(uint(id), req.Status); err != nil {
+	if err := h.SiteConnectionService.SetStatus(id, req.Status); err != nil {
 		if errors.Is(err, service.ErrConnectionNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.connection_not_found", nil)
 			return

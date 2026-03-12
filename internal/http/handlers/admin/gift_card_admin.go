@@ -111,12 +111,12 @@ func (h *Handler) GetGiftCards(c *gin.Context) {
 
 	var redeemedUserID uint
 	if rawUserID := strings.TrimSpace(c.Query("redeemed_user_id")); rawUserID != "" {
-		parsed, err := strconv.ParseUint(rawUserID, 10, 64)
-		if err != nil || parsed == 0 {
+		parsed, err := shared.ParseQueryUint(rawUserID, true)
+		if err != nil {
 			shared.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 			return
 		}
-		redeemedUserID = uint(parsed)
+		redeemedUserID = parsed
 	}
 
 	createdFrom, err := shared.ParseTimeNullable(strings.TrimSpace(c.Query("created_from")))

@@ -2,7 +2,6 @@ package public
 
 import (
 	"errors"
-	"strconv"
 	"time"
 
 	"github.com/dujiao-next/internal/constants"
@@ -99,12 +98,12 @@ func (h *Handler) CapturePayment(c *gin.Context) {
 	if !ok {
 		return
 	}
-	paymentID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || paymentID == 0 {
+	paymentID, err := shared.ParseParamUint(c, "id")
+	if err != nil {
 		shared.RespondError(c, response.CodeBadRequest, "error.payment_invalid", nil)
 		return
 	}
-	payment, err := h.PaymentService.GetPayment(uint(paymentID))
+	payment, err := h.PaymentService.GetPayment(paymentID)
 	if err != nil {
 		if errors.Is(err, service.ErrPaymentNotFound) {
 			shared.RespondError(c, response.CodeNotFound, "error.payment_not_found", nil)
@@ -122,7 +121,7 @@ func (h *Handler) CapturePayment(c *gin.Context) {
 		return
 	}
 	updated, err := h.PaymentService.CapturePayment(service.CapturePaymentInput{
-		PaymentID: uint(paymentID),
+		PaymentID: paymentID,
 		Context:   c.Request.Context(),
 	})
 	if err != nil {
