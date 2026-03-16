@@ -299,3 +299,14 @@ SELECT COUNT(1) FROM (
 
 	return nil
 }
+
+// ensureCategoryParentMigration 兼容历史单层分类数据，统一将空 parent_id 视为 0。
+func ensureCategoryParentMigration() error {
+	if DB == nil {
+		return errors.New("database is not initialized")
+	}
+	if !DB.Migrator().HasColumn(&Category{}, "parent_id") {
+		return nil
+	}
+	return DB.Model(&Category{}).Where("parent_id IS NULL").Update("parent_id", 0).Error
+}

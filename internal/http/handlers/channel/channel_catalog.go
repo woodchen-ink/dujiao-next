@@ -26,24 +26,38 @@ func (h *Handler) GetCategories(c *gin.Context) {
 
 	type categoryItem struct {
 		ID           uint   `json:"id"`
+		ParentID     uint   `json:"parent_id"`
 		Name         string `json:"name"`
 		Icon         string `json:"icon"`
 		Slug         string `json:"slug"`
 		ProductCount int64  `json:"product_count"`
 	}
 
-	var items []categoryItem
+	directCounts := make(map[uint]int64, len(categories))
+	visibleParentIDs := make(map[uint]struct{})
 	for _, cat := range categories {
 		count, err := h.CategoryRepo.CountActiveProducts(fmt.Sprintf("%d", cat.ID))
 		if err != nil {
 			logger.Warnw("channel_catalog_count_products", "category_id", cat.ID, "error", err)
 			count = 0
 		}
+		directCounts[cat.ID] = count
+		if count > 0 && cat.ParentID != 0 {
+			visibleParentIDs[cat.ParentID] = struct{}{}
+		}
+	}
+
+	var items []categoryItem
+	for _, cat := range categories {
+		count := directCounts[cat.ID]
 		if count == 0 {
-			continue // 跳过无上架商品的分类
+			if _, ok := visibleParentIDs[cat.ID]; !ok {
+				continue
+			}
 		}
 		items = append(items, categoryItem{
 			ID:           cat.ID,
+			ParentID:     cat.ParentID,
 			Name:         resolveLocalizedJSON(cat.NameJSON, locale, defaultLocale),
 			Icon:         cat.Icon,
 			Slug:         cat.Slug,

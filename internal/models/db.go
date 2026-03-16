@@ -133,6 +133,9 @@ func AutoMigrate() error {
 	if err := ensureManualStockRemainingMigration(); err != nil {
 		return err
 	}
+	if err := ensureCategoryParentMigration(); err != nil {
+		return err
+	}
 
 	// 移除历史遗留商品币种列，统一由站点配置提供币种。
 	if DB.Migrator().HasColumn(&Product{}, "price_currency") {

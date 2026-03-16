@@ -25,6 +25,7 @@ func (h *Handler) GetAdminCategories(c *gin.Context) {
 
 // CreateCategoryRequest 创建分类请求
 type CreateCategoryRequest struct {
+	ParentID  uint                   `json:"parent_id"`
 	Slug      string                 `json:"slug" binding:"required"`
 	NameJSON  map[string]interface{} `json:"name" binding:"required"`
 	Icon      string                 `json:"icon"`
@@ -40,6 +41,7 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 	}
 
 	category, err := h.CategoryService.Create(service.CreateCategoryInput{
+		ParentID:  req.ParentID,
 		Slug:      req.Slug,
 		NameJSON:  req.NameJSON,
 		Icon:      req.Icon,
@@ -48,6 +50,10 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, service.ErrSlugExists) {
 			shared.RespondError(c, response.CodeBadRequest, "error.slug_exists", nil)
+			return
+		}
+		if errors.Is(err, service.ErrCategoryParentInvalid) {
+			shared.RespondError(c, response.CodeBadRequest, "error.category_parent_invalid", nil)
 			return
 		}
 		shared.RespondError(c, response.CodeInternal, "error.category_create_failed", err)
@@ -68,6 +74,7 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 	}
 
 	category, err := h.CategoryService.Update(id, service.CreateCategoryInput{
+		ParentID:  req.ParentID,
 		Slug:      req.Slug,
 		NameJSON:  req.NameJSON,
 		Icon:      req.Icon,
@@ -80,6 +87,10 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 		}
 		if errors.Is(err, service.ErrSlugExists) {
 			shared.RespondError(c, response.CodeBadRequest, "error.slug_used", nil)
+			return
+		}
+		if errors.Is(err, service.ErrCategoryParentInvalid) {
+			shared.RespondError(c, response.CodeBadRequest, "error.category_parent_invalid", nil)
 			return
 		}
 		shared.RespondError(c, response.CodeInternal, "error.category_update_failed", err)

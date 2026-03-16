@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -271,7 +272,7 @@ func newAutoStockProductService(t *testing.T) (*ProductService, *gorm.DB) {
 		t.Fatalf("auto migrate card secret failed: %v", err)
 	}
 	secretRepo := repository.NewCardSecretRepository(db)
-	return NewProductService(nil, nil, secretRepo), db
+	return NewProductService(nil, nil, secretRepo, nil), db
 }
 
 func insertCardSecrets(t *testing.T, db *gorm.DB, productID, skuID uint, status string, count int) {
@@ -287,4 +288,113 @@ func insertCardSecrets(t *testing.T, db *gorm.DB, productID, skuID uint, status 
 			t.Fatalf("create card secret failed: %v", err)
 		}
 	}
+}
+
+func TestProductServiceListPublicIncludesChildProductsForParentCategory(t *testing.T) {
+	svc, db := newProductServiceForTest(t)
+
+	parent := models.Category{
+		Slug:     "games",
+		NameJSON: models.JSON{"zh-CN": "games"},
+	}
+	child := models.Category{
+		ParentID: 1,
+		Slug:     "steam",
+		NameJSON: models.JSON{"zh-CN": "steam"},
+	}
+	if err := db.Create(&parent).Error; err != nil {
+		t.Fatalf("create parent category failed: %v", err)
+	}
+	child.ParentID = parent.ID
+	if err := db.Create(&child).Error; err != nil {
+		t.Fatalf("create child category failed: %v", err)
+	}
+
+	parentProduct := models.Product{
+		CategoryID:  parent.ID,
+		Slug:        "parent-product",
+		TitleJSON:   models.JSON{"zh-CN": "parent-product"},
+		PriceAmount: models.NewMoneyFromDecimal(decimal.NewFromInt(10)),
+		IsActive:    true,
+	}
+	childProduct := models.Product{
+		CategoryID:  child.ID,
+		Slug:        "child-product",
+		TitleJSON:   models.JSON{"zh-CN": "child-product"},
+		PriceAmount: models.NewMoneyFromDecimal(decimal.NewFromInt(10)),
+		IsActive:    true,
+	}
+	if err := db.Create(&parentProduct).Error; err != nil {
+		t.Fatalf("create parent product failed: %v", err)
+	}
+	if err := db.Create(&childProduct).Error; err != nil {
+		t.Fatalf("create child product failed: %v", err)
+	}
+
+	products, total, err := svc.ListPublic(strconv.FormatUint(uint64(parent.ID), 10), "", 1, 20)
+	if err != nil {
+		t.Fatalf("list public products failed: %v", err)
+	}
+	if total != 2 {
+		t.Fatalf("expected total=2, got %d", total)
+	}
+	if len(products) != 2 {
+		t.Fatalf("expected 2 products, got %d", len(products))
+	}
+}
+
+func TestProductServiceCreateRejectsParentCategoryWithChildren(t *testing.T) {
+	svc, db := newProductServiceForTest(t)
+
+	parent := models.Category{
+		Slug:     "games",
+		NameJSON: models.JSON{"zh-CN": "games"},
+	}
+	if err := db.Create(&parent).Error; err != nil {
+		t.Fatalf("create parent category failed: %v", err)
+	}
+	child := models.Category{
+		ParentID: parent.ID,
+		Slug:     "steam",
+		NameJSON: models.JSON{"zh-CN": "steam"},
+	}
+	if err := db.Create(&child).Error; err != nil {
+		t.Fatalf("create child category failed: %v", err)
+	}
+
+	_, err := svc.Create(CreateProductInput{
+		CategoryID:      parent.ID,
+		Slug:            "invalid-parent-product",
+		TitleJSON:       map[string]interface{}{"zh-CN": "invalid-parent-product"},
+		PriceAmount:     decimal.NewFromInt(10),
+		PurchaseType:    constants.ProductPurchaseMember,
+		FulfillmentType: constants.FulfillmentTypeManual,
+		ManualStockTotal: func() *int {
+			value := 1
+			return &value
+		}(),
+	})
+	if err != ErrProductCategoryInvalid {
+		t.Fatalf("expected ErrProductCategoryInvalid, got %v", err)
+	}
+}
+
+func newProductServiceForTest(t *testing.T) (*ProductService, *gorm.DB) {
+	t.Helper()
+
+	dsn := fmt.Sprintf("file:product_service_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite failed: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Category{}, &models.Product{}, &models.ProductSKU{}); err != nil {
+		t.Fatalf("auto migrate product service tables failed: %v", err)
+	}
+
+	return NewProductService(
+		repository.NewProductRepository(db),
+		repository.NewProductSKURepository(db),
+		nil,
+		repository.NewCategoryRepository(db),
+	), db
 }

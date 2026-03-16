@@ -64,7 +64,9 @@ func (r *GormProductRepository) List(filter ProductListFilter) ([]models.Product
 			return db.Order("sort_order DESC, id ASC")
 		})
 	}
-	if filter.CategoryID != "" {
+	if len(filter.CategoryIDs) > 0 {
+		query = query.Where("category_id IN ?", filter.CategoryIDs)
+	} else if filter.CategoryID != "" {
 		query = query.Where("category_id = ?", filter.CategoryID)
 	}
 	if fulfillmentType := strings.TrimSpace(filter.FulfillmentType); fulfillmentType != "" {

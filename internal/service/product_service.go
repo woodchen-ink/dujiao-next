@@ -17,14 +17,16 @@ type ProductService struct {
 	repo           repository.ProductRepository
 	productSKURepo repository.ProductSKURepository
 	cardSecretRepo repository.CardSecretRepository
+	categoryRepo   repository.CategoryRepository
 }
 
 // NewProductService 创建商品服务
-func NewProductService(repo repository.ProductRepository, productSKURepo repository.ProductSKURepository, cardSecretRepo repository.CardSecretRepository) *ProductService {
+func NewProductService(repo repository.ProductRepository, productSKURepo repository.ProductSKURepository, cardSecretRepo repository.CardSecretRepository, categoryRepo repository.CategoryRepository) *ProductService {
 	return &ProductService{
 		repo:           repo,
 		productSKURepo: productSKURepo,
 		cardSecretRepo: cardSecretRepo,
+		categoryRepo:   categoryRepo,
 	}
 }
 
@@ -62,10 +64,16 @@ type ProductSKUInput struct {
 
 // ListPublic 获取公开商品列表
 func (s *ProductService) ListPublic(categoryID, search string, page, pageSize int) ([]models.Product, int64, error) {
+	categoryIDs, err := expandPublicCategoryIDs(s.categoryRepo, categoryID)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	filter := repository.ProductListFilter{
 		Page:         page,
 		PageSize:     pageSize,
 		CategoryID:   categoryID,
+		CategoryIDs:  categoryIDs,
 		Search:       search,
 		OnlyActive:   true,
 		WithCategory: true,
@@ -114,6 +122,10 @@ func (s *ProductService) GetAdminByID(id string) (*models.Product, error) {
 
 // Create 创建商品
 func (s *ProductService) Create(input CreateProductInput) (*models.Product, error) {
+	if err := validateProductCategoryAssignment(s.categoryRepo, input.CategoryID, 0); err != nil {
+		return nil, err
+	}
+
 	count, err := s.repo.CountBySlug(input.Slug, nil)
 	if err != nil {
 		return nil, err
@@ -228,6 +240,9 @@ func (s *ProductService) Update(id string, input CreateProductInput) (*models.Pr
 	}
 	if product == nil {
 		return nil, ErrNotFound
+	}
+	if err := validateProductCategoryAssignment(s.categoryRepo, input.CategoryID, product.CategoryID); err != nil {
+		return nil, err
 	}
 
 	count, err := s.repo.CountBySlug(input.Slug, &id)
@@ -627,6 +642,70 @@ func normalizeManualStockStatus(raw string) string {
 	default:
 		return ""
 	}
+}
+
+func expandPublicCategoryIDs(categoryRepo repository.CategoryRepository, categoryID string) ([]uint, error) {
+	normalizedCategoryID := strings.TrimSpace(categoryID)
+	if normalizedCategoryID == "" {
+		return nil, nil
+	}
+
+	parsedCategoryID, err := strconv.ParseUint(normalizedCategoryID, 10, 64)
+	if err != nil || parsedCategoryID == 0 {
+		return nil, nil
+	}
+	if categoryRepo == nil {
+		return []uint{uint(parsedCategoryID)}, nil
+	}
+
+	category, err := categoryRepo.GetByID(normalizedCategoryID)
+	if err != nil {
+		return nil, err
+	}
+	if category == nil {
+		return []uint{uint(parsedCategoryID)}, nil
+	}
+	if category.ParentID > 0 {
+		return []uint{category.ID}, nil
+	}
+
+	categories, err := categoryRepo.List()
+	if err != nil {
+		return nil, err
+	}
+
+	categoryIDs := []uint{category.ID}
+	for _, item := range categories {
+		if item.ParentID == category.ID {
+			categoryIDs = append(categoryIDs, item.ID)
+		}
+	}
+	return categoryIDs, nil
+}
+
+func validateProductCategoryAssignment(categoryRepo repository.CategoryRepository, categoryID uint, currentCategoryID uint) error {
+	if categoryID == 0 || categoryRepo == nil {
+		return nil
+	}
+
+	categoryIDText := strconv.FormatUint(uint64(categoryID), 10)
+	category, err := categoryRepo.GetByID(categoryIDText)
+	if err != nil {
+		return err
+	}
+	if category == nil {
+		return ErrProductCategoryInvalid
+	}
+
+	childCount, err := categoryRepo.CountChildren(categoryIDText)
+	if err != nil {
+		return err
+	}
+	if childCount > 0 && categoryID != currentCategoryID {
+		return ErrProductCategoryInvalid
+	}
+
+	return nil
 }
 
 // Delete 删除商品

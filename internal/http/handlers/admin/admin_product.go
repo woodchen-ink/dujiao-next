@@ -167,6 +167,10 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 			shared.RespondError(c, response.CodeBadRequest, "error.product_purchase_invalid", nil)
 			return
 		}
+		if errors.Is(err, service.ErrProductCategoryInvalid) {
+			shared.RespondError(c, response.CodeBadRequest, "error.product_category_invalid", nil)
+			return
+		}
 		if errors.Is(err, service.ErrFulfillmentInvalid) {
 			shared.RespondError(c, response.CodeBadRequest, "error.fulfillment_invalid", nil)
 			return
@@ -235,6 +239,10 @@ func (h *Handler) UpdateProduct(c *gin.Context) {
 		}
 		if errors.Is(err, service.ErrProductPurchaseInvalid) {
 			shared.RespondError(c, response.CodeBadRequest, "error.product_purchase_invalid", nil)
+			return
+		}
+		if errors.Is(err, service.ErrProductCategoryInvalid) {
+			shared.RespondError(c, response.CodeBadRequest, "error.product_category_invalid", nil)
 			return
 		}
 		if errors.Is(err, service.ErrFulfillmentInvalid) {

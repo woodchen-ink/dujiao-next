@@ -5,7 +5,9 @@ import "errors"
 var (
 	ErrNotFound                        = errors.New("not found")
 	ErrSlugExists                      = errors.New("slug exists")
+	ErrCategoryParentInvalid           = errors.New("category parent invalid")
 	ErrCategoryInUse                   = errors.New("category in use")
+	ErrProductCategoryInvalid          = errors.New("product category invalid")
 	ErrInvalidCredentials              = errors.New("invalid credentials")
 	ErrInvalidPassword                 = errors.New("invalid password")
 	ErrWeakPassword                    = errors.New("weak password")

@@ -16,6 +16,7 @@ type CategoryRepository interface {
 	Update(category *models.Category) error
 	Delete(id string) error
 	CountBySlug(slug string, excludeID *string) (int64, error)
+	CountChildren(categoryID string) (int64, error)
 	CountProducts(categoryID string) (int64, error)
 	CountActiveProducts(categoryID string) (int64, error)
 }
@@ -74,6 +75,15 @@ func (r *GormCategoryRepository) CountBySlug(slug string, excludeID *string) (in
 		query = query.Where("id != ?", *excludeID)
 	}
 	if err := query.Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// CountChildren 统计某分类的子分类数量
+func (r *GormCategoryRepository) CountChildren(categoryID string) (int64, error) {
+	var count int64
+	if err := r.db.Model(&models.Category{}).Where("parent_id = ?", categoryID).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil

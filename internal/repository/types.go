@@ -17,6 +17,7 @@ type ProductListFilter struct {
 	Page              int
 	PageSize          int
 	CategoryID        string
+	CategoryIDs       []uint
 	Search            string
 	FulfillmentType   string
 	ManualStockStatus string

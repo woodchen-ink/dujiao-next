@@ -106,6 +106,10 @@ func (h *Handler) ImportUpstreamProduct(c *gin.Context) {
 			shared.RespondError(c, response.CodeBadRequest, "error.slug_exists", nil)
 			return
 		}
+		if errors.Is(err, service.ErrProductCategoryInvalid) {
+			shared.RespondError(c, response.CodeBadRequest, "error.product_category_invalid", nil)
+			return
+		}
 		shared.RespondError(c, response.CodeInternal, "error.mapping_import_failed", err)
 		return
 	}

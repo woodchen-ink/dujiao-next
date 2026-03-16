@@ -31,6 +31,7 @@ type ProductMappingService struct {
 	skuMappingRepo repository.SKUMappingRepository
 	productRepo    repository.ProductRepository
 	productSKURepo repository.ProductSKURepository
+	categoryRepo   repository.CategoryRepository
 	connService    *SiteConnectionService
 }
 
@@ -40,6 +41,7 @@ func NewProductMappingService(
 	skuMappingRepo repository.SKUMappingRepository,
 	productRepo repository.ProductRepository,
 	productSKURepo repository.ProductSKURepository,
+	categoryRepo repository.CategoryRepository,
 	connService *SiteConnectionService,
 ) *ProductMappingService {
 	return &ProductMappingService{
@@ -47,12 +49,17 @@ func NewProductMappingService(
 		skuMappingRepo: skuMappingRepo,
 		productRepo:    productRepo,
 		productSKURepo: productSKURepo,
+		categoryRepo:   categoryRepo,
 		connService:    connService,
 	}
 }
 
 // ImportUpstreamProduct 从上游导入商品（克隆为本地商品 + 建立映射）
 func (s *ProductMappingService) ImportUpstreamProduct(connectionID uint, upstreamProductID uint, categoryID uint, slug string) (*models.ProductMapping, error) {
+	if err := validateProductCategoryAssignment(s.categoryRepo, categoryID, 0); err != nil {
+		return nil, err
+	}
+
 	// 检查是否已存在映射
 	existing, err := s.mappingRepo.GetByConnectionAndUpstreamID(connectionID, upstreamProductID)
 	if err != nil {
