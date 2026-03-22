@@ -174,6 +174,7 @@ func (s *CardSecretService) ImportCardSecretCSV(input ImportCardSecretCSVInput) 
 type ListCardSecretInput struct {
 	ProductID uint
 	SKUID     uint
+	BatchID   uint
 	Status    string
 	Page      int
 	PageSize  int
@@ -197,9 +198,9 @@ func (s *CardSecretService) ListCardSecrets(input ListCardSecretInput) ([]models
 		err   error
 	)
 	if input.ProductID == 0 {
-		items, total, err = s.secretRepo.ListAll(status, input.Page, input.PageSize)
+		items, total, err = s.secretRepo.ListAll(status, input.BatchID, input.Page, input.PageSize)
 	} else {
-		items, total, err = s.secretRepo.ListByProduct(input.ProductID, input.SKUID, status, input.Page, input.PageSize)
+		items, total, err = s.secretRepo.ListByProduct(input.ProductID, input.SKUID, status, input.BatchID, input.Page, input.PageSize)
 	}
 	if err != nil {
 		return nil, 0, ErrCardSecretFetchFailed
@@ -208,16 +209,16 @@ func (s *CardSecretService) ListCardSecrets(input ListCardSecretInput) ([]models
 }
 
 // BatchUpdateCardSecretStatus 批量更新卡密状态
-func (s *CardSecretService) BatchUpdateCardSecretStatus(ids []uint, status string) (int64, error) {
-	normalizedIDs := normalizeCardSecretIDs(ids)
-	if len(normalizedIDs) == 0 {
-		return 0, ErrCardSecretInvalid
-	}
+func (s *CardSecretService) BatchUpdateCardSecretStatus(ids []uint, batchID uint, status string) (int64, error) {
 	normalizedStatus := strings.TrimSpace(status)
 	switch normalizedStatus {
 	case models.CardSecretStatusAvailable, models.CardSecretStatusReserved, models.CardSecretStatusUsed:
 	default:
 		return 0, ErrCardSecretInvalid
+	}
+	normalizedIDs, err := s.resolveBatchTargetCardSecretIDs(ids, batchID)
+	if err != nil {
+		return 0, err
 	}
 	rows, err := s.secretRepo.BatchUpdateStatus(normalizedIDs, normalizedStatus, time.Now())
 	if err != nil {
@@ -227,10 +228,10 @@ func (s *CardSecretService) BatchUpdateCardSecretStatus(ids []uint, status strin
 }
 
 // BatchDeleteCardSecrets 批量删除卡密
-func (s *CardSecretService) BatchDeleteCardSecrets(ids []uint) (int64, error) {
-	normalizedIDs := normalizeCardSecretIDs(ids)
-	if len(normalizedIDs) == 0 {
-		return 0, ErrCardSecretInvalid
+func (s *CardSecretService) BatchDeleteCardSecrets(ids []uint, batchID uint) (int64, error) {
+	normalizedIDs, err := s.resolveBatchTargetCardSecretIDs(ids, batchID)
+	if err != nil {
+		return 0, err
 	}
 	rows, err := s.secretRepo.BatchDeleteByIDs(normalizedIDs)
 	if err != nil {
@@ -240,16 +241,16 @@ func (s *CardSecretService) BatchDeleteCardSecrets(ids []uint) (int64, error) {
 }
 
 // ExportCardSecrets 批量导出卡密（txt/csv）
-func (s *CardSecretService) ExportCardSecrets(ids []uint, format string) ([]byte, string, error) {
-	normalizedIDs := normalizeCardSecretIDs(ids)
-	if len(normalizedIDs) == 0 {
-		return nil, "", ErrCardSecretInvalid
-	}
+func (s *CardSecretService) ExportCardSecrets(ids []uint, batchID uint, format string) ([]byte, string, error) {
 	normalizedFormat := strings.ToLower(strings.TrimSpace(format))
 	switch normalizedFormat {
 	case constants.ExportFormatTXT, constants.ExportFormatCSV:
 	default:
 		return nil, "", ErrCardSecretInvalid
+	}
+	normalizedIDs, err := s.resolveBatchTargetCardSecretIDs(ids, batchID)
+	if err != nil {
+		return nil, "", err
 	}
 
 	items, err := s.secretRepo.ListByIDs(normalizedIDs)
@@ -306,6 +307,24 @@ func (s *CardSecretService) ExportCardSecrets(ids []uint, format string) ([]byte
 		return nil, "", ErrCardSecretFetchFailed
 	}
 	return buffer.Bytes(), "text/csv; charset=utf-8", nil
+}
+
+func (s *CardSecretService) resolveBatchTargetCardSecretIDs(ids []uint, batchID uint) ([]uint, error) {
+	normalizedIDs := normalizeCardSecretIDs(ids)
+	if len(normalizedIDs) > 0 {
+		return normalizedIDs, nil
+	}
+	if batchID == 0 {
+		return nil, ErrCardSecretInvalid
+	}
+	targetIDs, err := s.secretRepo.ListIDsByBatchID(batchID)
+	if err != nil {
+		return nil, ErrCardSecretFetchFailed
+	}
+	if len(targetIDs) == 0 {
+		return nil, ErrNotFound
+	}
+	return targetIDs, nil
 }
 
 // UpdateCardSecret 更新卡密

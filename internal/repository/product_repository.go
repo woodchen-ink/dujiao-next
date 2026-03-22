@@ -3,6 +3,7 @@ package repository
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/dujiao-next/internal/constants"
@@ -77,7 +78,11 @@ func (r *GormProductRepository) List(filter ProductListFilter) ([]models.Product
 	if search := strings.TrimSpace(filter.Search); search != "" {
 		like := "%" + search + "%"
 		condition, argCount := buildLocalizedLikeCondition(r.db, []string{"slug"}, []string{"title_json", "description_json"})
-		query = query.Where(condition, repeatLikeArgs(like, argCount)...)
+		searchQuery := r.db.Where(condition, repeatLikeArgs(like, argCount)...)
+		if numericID, err := strconv.ParseUint(search, 10, 64); err == nil && numericID > 0 {
+			searchQuery = searchQuery.Or("id = ?", uint(numericID))
+		}
+		query = query.Where(searchQuery)
 	}
 
 	manualStockStatus := strings.ToLower(strings.TrimSpace(filter.ManualStockStatus))

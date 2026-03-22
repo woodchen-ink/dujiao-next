@@ -1,7 +1,10 @@
 package repository
 
 import (
+	"fmt"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/models"
@@ -13,7 +16,8 @@ import (
 
 func setupProductRepositoryTest(t *testing.T) (*GormProductRepository, *gorm.DB) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	dsn := fmt.Sprintf("file:product_repository_test_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite failed: %v", err)
 	}
@@ -285,5 +289,60 @@ func TestProductRepositoryListSortOrderDescending(t *testing.T) {
 	}
 	if rows[0].Slug != "high-sort-product" || rows[1].Slug != "low-sort-product" {
 		t.Fatalf("expected high sort_order first, got %s then %s", rows[0].Slug, rows[1].Slug)
+	}
+}
+
+func TestProductRepositoryListSupportsNumericIDSearch(t *testing.T) {
+	repo, _ := setupProductRepositoryTest(t)
+
+	target := &models.Product{
+		CategoryID:      1,
+		Slug:            "numeric-id-search-target",
+		TitleJSON:       models.JSON{"zh-CN": "数字搜索目标"},
+		PriceAmount:     models.NewMoneyFromDecimal(decimal.NewFromInt(100)),
+		PurchaseType:    constants.ProductPurchaseMember,
+		FulfillmentType: constants.FulfillmentTypeAuto,
+		IsActive:        true,
+	}
+	if err := repo.Create(target); err != nil {
+		t.Fatalf("create target product failed: %v", err)
+	}
+
+	other := &models.Product{
+		CategoryID:      1,
+		Slug:            "numeric-id-search-other",
+		TitleJSON:       models.JSON{"zh-CN": "另一个商品"},
+		PriceAmount:     models.NewMoneyFromDecimal(decimal.NewFromInt(100)),
+		PurchaseType:    constants.ProductPurchaseMember,
+		FulfillmentType: constants.FulfillmentTypeAuto,
+		IsActive:        true,
+	}
+	if err := repo.Create(other); err != nil {
+		t.Fatalf("create other product failed: %v", err)
+	}
+
+	rows, total, err := repo.List(ProductListFilter{
+		Page:       1,
+		PageSize:   20,
+		Search:     strconv.FormatUint(uint64(target.ID), 10),
+		OnlyActive: true,
+	})
+	if err != nil {
+		t.Fatalf("search by numeric product id failed: %v", err)
+	}
+	if total == 0 || len(rows) == 0 {
+		t.Fatalf("search by numeric product id should return target product")
+	}
+	if rows[0].ID != target.ID {
+		found := false
+		for _, row := range rows {
+			if row.ID == target.ID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("search result missing target product id=%d rows=%+v", target.ID, rows)
+		}
 	}
 }

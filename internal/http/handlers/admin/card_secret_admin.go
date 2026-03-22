@@ -31,19 +31,22 @@ type UpdateCardSecretRequest struct {
 
 // BatchUpdateCardSecretStatusRequest 批量更新卡密状态请求
 type BatchUpdateCardSecretStatusRequest struct {
-	IDs    []uint `json:"ids" binding:"required"`
-	Status string `json:"status" binding:"required"`
+	IDs     []uint `json:"ids"`
+	BatchID uint   `json:"batch_id"`
+	Status  string `json:"status" binding:"required"`
 }
 
 // BatchDeleteCardSecretRequest 批量删除卡密请求
 type BatchDeleteCardSecretRequest struct {
-	IDs []uint `json:"ids" binding:"required"`
+	IDs     []uint `json:"ids"`
+	BatchID uint   `json:"batch_id"`
 }
 
 // ExportCardSecretRequest 批量导出卡密请求
 type ExportCardSecretRequest struct {
-	IDs    []uint `json:"ids" binding:"required"`
-	Format string `json:"format" binding:"required"`
+	IDs     []uint `json:"ids"`
+	BatchID uint   `json:"batch_id"`
+	Format  string `json:"format" binding:"required"`
 }
 
 // CreateCardSecretBatch 批量录入卡密
@@ -175,6 +178,16 @@ func (h *Handler) GetCardSecrets(c *gin.Context) {
 		}
 		skuID = parsed
 	}
+	var batchID uint
+	rawBatchID := strings.TrimSpace(c.Query("batch_id"))
+	if rawBatchID != "" {
+		parsed, err := shared.ParseQueryUint(rawBatchID, false)
+		if err != nil {
+			shared.RespondError(c, response.CodeBadRequest, "error.card_secret_invalid", nil)
+			return
+		}
+		batchID = parsed
+	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	page, pageSize = shared.NormalizePagination(page, pageSize)
@@ -183,6 +196,7 @@ func (h *Handler) GetCardSecrets(c *gin.Context) {
 	items, total, err := h.CardSecretService.ListCardSecrets(service.ListCardSecretInput{
 		ProductID: productID,
 		SKUID:     skuID,
+		BatchID:   batchID,
 		Status:    status,
 		Page:      page,
 		PageSize:  pageSize,
@@ -258,11 +272,13 @@ func (h *Handler) BatchUpdateCardSecretStatus(c *gin.Context) {
 		return
 	}
 
-	rows, err := h.CardSecretService.BatchUpdateCardSecretStatus(req.IDs, req.Status)
+	rows, err := h.CardSecretService.BatchUpdateCardSecretStatus(req.IDs, req.BatchID, req.Status)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrCardSecretInvalid):
 			shared.RespondError(c, response.CodeBadRequest, "error.card_secret_invalid", nil)
+		case errors.Is(err, service.ErrNotFound):
+			shared.RespondError(c, response.CodeNotFound, "error.card_secret_not_found", nil)
 		case errors.Is(err, service.ErrCardSecretUpdateFailed):
 			shared.RespondError(c, response.CodeInternal, "error.card_secret_update_failed", err)
 		default:
@@ -284,11 +300,13 @@ func (h *Handler) BatchDeleteCardSecrets(c *gin.Context) {
 		return
 	}
 
-	rows, err := h.CardSecretService.BatchDeleteCardSecrets(req.IDs)
+	rows, err := h.CardSecretService.BatchDeleteCardSecrets(req.IDs, req.BatchID)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrCardSecretInvalid):
 			shared.RespondError(c, response.CodeBadRequest, "error.card_secret_invalid", nil)
+		case errors.Is(err, service.ErrNotFound):
+			shared.RespondError(c, response.CodeNotFound, "error.card_secret_not_found", nil)
 		case errors.Is(err, service.ErrCardSecretDeleteFailed):
 			shared.RespondError(c, response.CodeInternal, "error.card_secret_delete_failed", err)
 		default:
@@ -310,7 +328,7 @@ func (h *Handler) ExportCardSecrets(c *gin.Context) {
 		return
 	}
 
-	content, contentType, err := h.CardSecretService.ExportCardSecrets(req.IDs, req.Format)
+	content, contentType, err := h.CardSecretService.ExportCardSecrets(req.IDs, req.BatchID, req.Format)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrCardSecretInvalid):

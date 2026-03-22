@@ -12,9 +12,10 @@ import (
 // CardSecretRepository 卡密库存数据访问接口
 type CardSecretRepository interface {
 	CreateBatch(items []models.CardSecret) error
-	ListByProduct(productID, skuID uint, status string, page, pageSize int) ([]models.CardSecret, int64, error)
-	ListAll(status string, page, pageSize int) ([]models.CardSecret, int64, error)
+	ListByProduct(productID, skuID uint, status string, batchID uint, page, pageSize int) ([]models.CardSecret, int64, error)
+	ListAll(status string, batchID uint, page, pageSize int) ([]models.CardSecret, int64, error)
 	ListByIDs(ids []uint) ([]models.CardSecret, error)
+	ListIDsByBatchID(batchID uint) ([]uint, error)
 	ListByOrderAndStatus(orderID uint, status string) ([]models.CardSecret, error)
 	GetByID(id uint) (*models.CardSecret, error)
 	Update(secret *models.CardSecret) error
@@ -67,7 +68,7 @@ func (r *GormCardSecretRepository) CreateBatch(items []models.CardSecret) error 
 }
 
 // ListByProduct 按商品获取卡密列表
-func (r *GormCardSecretRepository) ListByProduct(productID, skuID uint, status string, page, pageSize int) ([]models.CardSecret, int64, error) {
+func (r *GormCardSecretRepository) ListByProduct(productID, skuID uint, status string, batchID uint, page, pageSize int) ([]models.CardSecret, int64, error) {
 	if productID == 0 {
 		return nil, 0, errors.New("invalid product id")
 	}
@@ -77,6 +78,9 @@ func (r *GormCardSecretRepository) ListByProduct(productID, skuID uint, status s
 	}
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if batchID > 0 {
+		query = query.Where("batch_id = ?", batchID)
 	}
 
 	var total int64
@@ -97,10 +101,13 @@ func (r *GormCardSecretRepository) ListByProduct(productID, skuID uint, status s
 }
 
 // ListAll 获取全量卡密列表
-func (r *GormCardSecretRepository) ListAll(status string, page, pageSize int) ([]models.CardSecret, int64, error) {
+func (r *GormCardSecretRepository) ListAll(status string, batchID uint, page, pageSize int) ([]models.CardSecret, int64, error) {
 	query := r.db.Model(&models.CardSecret{}).Preload("Batch")
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if batchID > 0 {
+		query = query.Where("batch_id = ?", batchID)
 	}
 
 	var total int64
@@ -130,6 +137,18 @@ func (r *GormCardSecretRepository) ListByIDs(ids []uint) ([]models.CardSecret, e
 		return nil, err
 	}
 	return items, nil
+}
+
+// ListIDsByBatchID 按批次查询卡密 ID
+func (r *GormCardSecretRepository) ListIDsByBatchID(batchID uint) ([]uint, error) {
+	if batchID == 0 {
+		return []uint{}, nil
+	}
+	var ids []uint
+	if err := r.db.Model(&models.CardSecret{}).Where("batch_id = ?", batchID).Order("id asc").Pluck("id", &ids).Error; err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 // ListByOrderAndStatus 按订单与状态获取卡密
