@@ -29,7 +29,7 @@ func setupUserAuthServiceChannelIdentityTest(t *testing.T) (*UserAuthService, *g
 	userRepo := repository.NewUserRepository(db)
 	identityRepo := repository.NewUserOAuthIdentityRepository(db)
 
-	return NewUserAuthService(&config.Config{}, userRepo, identityRepo, repository.NewEmailVerifyCodeRepository(db), nil, nil), db
+	return NewUserAuthService(&config.Config{}, userRepo, identityRepo, repository.NewEmailVerifyCodeRepository(db), nil, nil, nil), db
 }
 
 func TestResolveTelegramChannelIdentityReturnsBoundUser(t *testing.T) {

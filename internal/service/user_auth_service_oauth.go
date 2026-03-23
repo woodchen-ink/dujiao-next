@@ -523,6 +523,15 @@ func (s *UserAuthService) findOrCreateTelegramUser(verified *TelegramIdentityVer
 		}
 		return user, nil
 	}
+	if s.settingService != nil {
+		registrationEnabled, err := s.settingService.GetRegistrationEnabled(true)
+		if err != nil {
+			return nil, err
+		}
+		if !registrationEnabled {
+			return nil, ErrRegistrationDisabled
+		}
+	}
 
 	randomSuffix, err := randomNumericCode(16)
 	if err != nil {

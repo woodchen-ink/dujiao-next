@@ -26,6 +26,7 @@ type UserAuthService struct {
 	userRepo              repository.UserRepository
 	userOAuthIdentityRepo repository.UserOAuthIdentityRepository
 	codeRepo              repository.EmailVerifyCodeRepository
+	settingService        *SettingService
 	emailService          *EmailService
 	telegramAuthService   *TelegramAuthService
 	memberLevelSvc        *MemberLevelService
@@ -42,6 +43,7 @@ func NewUserAuthService(
 	userRepo repository.UserRepository,
 	userOAuthIdentityRepo repository.UserOAuthIdentityRepository,
 	codeRepo repository.EmailVerifyCodeRepository,
+	settingService *SettingService,
 	emailService *EmailService,
 	telegramAuthService *TelegramAuthService,
 ) *UserAuthService {
@@ -50,6 +52,7 @@ func NewUserAuthService(
 		userRepo:              userRepo,
 		userOAuthIdentityRepo: userOAuthIdentityRepo,
 		codeRepo:              codeRepo,
+		settingService:        settingService,
 		emailService:          emailService,
 		telegramAuthService:   telegramAuthService,
 	}

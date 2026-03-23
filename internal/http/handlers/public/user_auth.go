@@ -330,6 +330,9 @@ func (h *Handler) UserTelegramLogin(c *gin.Context) {
 		case errors.Is(err, service.ErrUserDisabled):
 			h.recordUserLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonUserDisabled, constants.LoginLogSourceTelegram)
 			shared.RespondError(c, response.CodeUnauthorized, "error.user_disabled", nil)
+		case errors.Is(err, service.ErrRegistrationDisabled):
+			h.recordUserLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonBadRequest, constants.LoginLogSourceTelegram)
+			shared.RespondError(c, response.CodeForbidden, "error.registration_disabled", nil)
 		default:
 			h.recordUserLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonInternalError, constants.LoginLogSourceTelegram)
 			shared.RespondError(c, response.CodeInternal, "error.login_failed", err)
@@ -386,6 +389,9 @@ func (h *Handler) UserTelegramMiniAppLogin(c *gin.Context) {
 		case errors.Is(err, service.ErrUserDisabled):
 			h.recordUserLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonUserDisabled, constants.LoginLogSourceTelegram)
 			shared.RespondError(c, response.CodeUnauthorized, "error.user_disabled", nil)
+		case errors.Is(err, service.ErrRegistrationDisabled):
+			h.recordUserLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonBadRequest, constants.LoginLogSourceTelegram)
+			shared.RespondError(c, response.CodeForbidden, "error.registration_disabled", nil)
 		default:
 			h.recordUserLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonInternalError, constants.LoginLogSourceTelegram)
 			shared.RespondError(c, response.CodeInternal, "error.login_failed", err)
