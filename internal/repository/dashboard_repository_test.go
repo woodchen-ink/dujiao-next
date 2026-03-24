@@ -334,6 +334,80 @@ func TestGetStockStatsUsesActiveManualSKUs(t *testing.T) {
 	}
 }
 
+func TestGetInventoryAlertItemsFallsBackToProductLevelWhenOnlyInactiveAutoSKUHasStock(t *testing.T) {
+	repo, db := setupDashboardRepositoryTest(t)
+	if err := db.AutoMigrate(&models.CardSecret{}); err != nil {
+		t.Fatalf("migrate card secret failed: %v", err)
+	}
+
+	category := createDashboardCategory(t, db, "dashboard-auto-legacy-stock")
+	product := &models.Product{
+		CategoryID:      category.ID,
+		Slug:            "dashboard-auto-legacy-stock",
+		TitleJSON:       models.JSON{"zh-CN": "自动发货商品"},
+		PriceAmount:     models.NewMoneyFromDecimal(decimal.NewFromInt(99)),
+		PurchaseType:    constants.ProductPurchaseMember,
+		FulfillmentType: constants.FulfillmentTypeAuto,
+		IsActive:        true,
+	}
+	if err := db.Create(product).Error; err != nil {
+		t.Fatalf("create product failed: %v", err)
+	}
+
+	legacySKU := &models.ProductSKU{
+		ProductID:   product.ID,
+		SKUCode:     models.DefaultSKUCode,
+		PriceAmount: models.NewMoneyFromDecimal(decimal.NewFromInt(99)),
+		IsActive:    false,
+		SortOrder:   0,
+	}
+	activeSKU := &models.ProductSKU{
+		ProductID:   product.ID,
+		SKUCode:     "SKU-2",
+		PriceAmount: models.NewMoneyFromDecimal(decimal.NewFromInt(99)),
+		IsActive:    true,
+		SortOrder:   1,
+	}
+	if err := db.Create(legacySKU).Error; err != nil {
+		t.Fatalf("create legacy sku failed: %v", err)
+	}
+	if err := db.Model(legacySKU).Update("is_active", false).Error; err != nil {
+		t.Fatalf("disable legacy sku failed: %v", err)
+	}
+	if err := db.Create(activeSKU).Error; err != nil {
+		t.Fatalf("create active sku failed: %v", err)
+	}
+
+	for idx := 0; idx < 2; idx++ {
+		row := &models.CardSecret{
+			ProductID: product.ID,
+			SKUID:     legacySKU.ID,
+			Secret:    fmt.Sprintf("LEGACY-%d", idx),
+			Status:    models.CardSecretStatusAvailable,
+		}
+		if err := db.Create(row).Error; err != nil {
+			t.Fatalf("create legacy card secret failed: %v", err)
+		}
+	}
+
+	rows, err := repo.GetInventoryAlertItems(5)
+	if err != nil {
+		t.Fatalf("get inventory alert items failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("inventory alert rows want 1 got %d: %+v", len(rows), rows)
+	}
+	if rows[0].SKUID != activeSKU.ID {
+		t.Fatalf("fallback row should reuse the only active sku %d, got skuid=%d", activeSKU.ID, rows[0].SKUID)
+	}
+	if rows[0].AvailableStock != 2 {
+		t.Fatalf("fallback row stock want 2 got %d", rows[0].AvailableStock)
+	}
+	if rows[0].AlertType != constants.NotificationAlertTypeLowStockProducts {
+		t.Fatalf("fallback row alert type want low_stock_products got %s", rows[0].AlertType)
+	}
+}
+
 func TestGetOverviewUsesOrderCreationWindowForPaidGMV(t *testing.T) {
 	repo, db := setupDashboardRepositoryTest(t)
 	now := time.Now().UTC().Truncate(time.Second)

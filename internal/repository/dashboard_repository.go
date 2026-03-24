@@ -521,28 +521,47 @@ func collectManualInventoryAlertRows(product models.Product, lowStockThreshold i
 func collectAutoInventoryAlertRows(product models.Product, availableMap map[uint]int64, lowStockThreshold int64) []DashboardInventoryAlertRow {
 	result := make([]DashboardInventoryAlertRow, 0)
 	activeSKUs := activeProductSKUs(product.SKUs)
-	if len(activeSKUs) == 0 {
-		available := int64(0)
-		for _, total := range availableMap {
-			available += total
+	totalAvailable := int64(0)
+	activeSKUSet := make(map[uint]struct{}, len(activeSKUs))
+	for _, sku := range activeSKUs {
+		activeSKUSet[sku.ID] = struct{}{}
+	}
+	legacyInactiveAvailable := int64(0)
+	for skuID, total := range availableMap {
+		totalAvailable += total
+		if skuID == 0 {
+			continue
 		}
-		if alertType := classifyInventoryAlertType(available, lowStockThreshold); alertType != "" {
+		if _, ok := activeSKUSet[skuID]; ok {
+			continue
+		}
+		legacyInactiveAvailable += total
+	}
+	if len(activeSKUs) == 0 {
+		if alertType := classifyInventoryAlertType(totalAvailable, lowStockThreshold); alertType != "" {
 			result = append(result, DashboardInventoryAlertRow{
 				ProductID:        product.ID,
 				ProductTitleJSON: product.TitleJSON,
 				FulfillmentType:  constants.FulfillmentTypeAuto,
 				AlertType:        alertType,
-				AvailableStock:   available,
+				AvailableStock:   totalAvailable,
 			})
 		}
 		return result
 	}
 
 	legacyTargetIdx := resolveDashboardLegacyStockTargetSKUIndex(activeSKUs)
+	hasPositiveActive := false
 	for idx, sku := range activeSKUs {
 		available := availableMap[sku.ID]
 		if idx == legacyTargetIdx {
 			available += availableMap[0]
+		}
+		if len(activeSKUs) == 1 {
+			available += legacyInactiveAvailable
+		}
+		if available > 0 {
+			hasPositiveActive = true
 		}
 		if alertType := classifyInventoryAlertType(available, lowStockThreshold); alertType != "" {
 			result = append(result, DashboardInventoryAlertRow{
@@ -555,6 +574,20 @@ func collectAutoInventoryAlertRows(product models.Product, availableMap map[uint
 				AlertType:         alertType,
 				AvailableStock:    available,
 			})
+		}
+	}
+	if hasPositiveActive || legacyInactiveAvailable <= 0 {
+		return result
+	}
+	if fallbackType := classifyInventoryAlertType(totalAvailable, lowStockThreshold); fallbackType != "" {
+		return []DashboardInventoryAlertRow{
+			{
+				ProductID:        product.ID,
+				ProductTitleJSON: product.TitleJSON,
+				FulfillmentType:  constants.FulfillmentTypeAuto,
+				AlertType:        fallbackType,
+				AvailableStock:   totalAvailable,
+			},
 		}
 	}
 	return result

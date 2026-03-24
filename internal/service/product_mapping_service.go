@@ -142,15 +142,20 @@ func (s *ProductMappingService) ImportUpstreamProduct(connectionID uint, upstrea
 		SortOrder:            0,
 	}
 
-	// 使用事务创建本地商品 + 映射
+	var mapping *models.ProductMapping
+
+	// 使用事务一次性创建本地商品、SKU、映射与 SKU 映射，避免留下半成功数据。
 	if err := s.productRepo.Transaction(func(tx *gorm.DB) error {
 		productRepo := s.productRepo.WithTx(tx)
+		mappingRepo := s.mappingRepo.WithTx(tx)
+		skuMappingRepo := s.skuMappingRepo.WithTx(tx)
 		if err := productRepo.Create(&product); err != nil {
 			return fmt.Errorf("create local product: %w", err)
 		}
 
 		// 创建 SKU
 		skuRepo := s.productSKURepo.WithTx(tx)
+		localSKUs := make([]models.ProductSKU, 0, len(upProduct.SKUs))
 		for _, upSKU := range upProduct.SKUs {
 			skuPrice, _ := decimal.NewFromString(upSKU.PriceAmount)
 			localSKU := models.ProductSKU{
@@ -164,6 +169,7 @@ func (s *ProductMappingService) ImportUpstreamProduct(connectionID uint, upstrea
 			if err := skuRepo.Create(&localSKU); err != nil {
 				return fmt.Errorf("create local sku: %w", err)
 			}
+			localSKUs = append(localSKUs, localSKU)
 		}
 
 		// 如果没有 SKU，创建默认 SKU
@@ -179,44 +185,33 @@ func (s *ProductMappingService) ImportUpstreamProduct(connectionID uint, upstrea
 			if err := skuRepo.Create(&defaultSKU); err != nil {
 				return fmt.Errorf("create default sku: %w", err)
 			}
+			localSKUs = append(localSKUs, defaultSKU)
 		}
 
+		// 确定上游原始交付类型（auto/manual）
+		upstreamFulfillmentType := upProduct.FulfillmentType
+		if upstreamFulfillmentType != constants.FulfillmentTypeAuto {
+			upstreamFulfillmentType = constants.FulfillmentTypeManual
+		}
+
+		now := time.Now()
+		mapping = &models.ProductMapping{
+			ConnectionID:            connectionID,
+			LocalProductID:          product.ID,
+			UpstreamProductID:       upstreamProductID,
+			UpstreamFulfillmentType: upstreamFulfillmentType,
+			IsActive:                true,
+			LastSyncedAt:            &now,
+		}
+		if err := mappingRepo.Create(mapping); err != nil {
+			return fmt.Errorf("create product mapping: %w", err)
+		}
+		if err := createSKUMappingsWithRepo(skuMappingRepo, mapping.ID, localSKUs, upProduct.SKUs); err != nil {
+			return fmt.Errorf("create sku mappings: %w", err)
+		}
 		return nil
 	}); err != nil {
 		return nil, err
-	}
-
-	// 重新读取带 SKU 的商品
-	localProduct, err := s.productRepo.GetByID(strconv.FormatUint(uint64(product.ID), 10))
-	if err != nil {
-		return nil, err
-	}
-
-	// 确定上游原始交付类型（auto/manual）
-	upstreamFulfillmentType := upProduct.FulfillmentType
-	if upstreamFulfillmentType != constants.FulfillmentTypeAuto {
-		upstreamFulfillmentType = constants.FulfillmentTypeManual
-	}
-
-	// 创建 ProductMapping
-	now := time.Now()
-	mapping := &models.ProductMapping{
-		ConnectionID:            connectionID,
-		LocalProductID:          product.ID,
-		UpstreamProductID:       upstreamProductID,
-		UpstreamFulfillmentType: upstreamFulfillmentType,
-		IsActive:                true,
-		LastSyncedAt:            &now,
-	}
-	if err := s.mappingRepo.Create(mapping); err != nil {
-		return nil, fmt.Errorf("create product mapping: %w", err)
-	}
-
-	// 创建 SKU 映射
-	if localProduct != nil {
-		if err := s.createSKUMappings(mapping.ID, localProduct.SKUs, upProduct.SKUs); err != nil {
-			return nil, fmt.Errorf("create sku mappings: %w", err)
-		}
 	}
 
 	return mapping, nil
@@ -224,6 +219,18 @@ func (s *ProductMappingService) ImportUpstreamProduct(connectionID uint, upstrea
 
 // createSKUMappings 根据本地和上游 SKU 建立映射
 func (s *ProductMappingService) createSKUMappings(mappingID uint, localSKUs []models.ProductSKU, upstreamSKUs []upstream.UpstreamSKU) error {
+	return createSKUMappingsWithRepo(s.skuMappingRepo, mappingID, localSKUs, upstreamSKUs)
+}
+
+func createSKUMappingsWithRepo(
+	skuMappingRepo repository.SKUMappingRepository,
+	mappingID uint,
+	localSKUs []models.ProductSKU,
+	upstreamSKUs []upstream.UpstreamSKU,
+) error {
+	if skuMappingRepo == nil {
+		return nil
+	}
 	if len(localSKUs) == 0 || len(upstreamSKUs) == 0 {
 		return nil
 	}
@@ -257,7 +264,7 @@ func (s *ProductMappingService) createSKUMappings(mappingID uint, localSKUs []mo
 			UpstreamStock:    upSKU.StockQuantity,
 			StockSyncedAt:    &now,
 		}
-		if err := s.skuMappingRepo.Create(skuMapping); err != nil {
+		if err := skuMappingRepo.Create(skuMapping); err != nil {
 			return err
 		}
 	}

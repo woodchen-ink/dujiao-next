@@ -36,7 +36,7 @@ func setupCardSecretServiceTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func TestCreateCardSecretBatchFallbackToDefaultSKU(t *testing.T) {
+func TestCreateCardSecretBatchAutoMultiSKURequiresExplicitSKU(t *testing.T) {
 	db := setupCardSecretServiceTestDB(t)
 
 	product := &models.Product{
@@ -84,27 +84,73 @@ func TestCreateCardSecretBatchFallbackToDefaultSKU(t *testing.T) {
 		Source:    constants.CardSecretSourceManual,
 		AdminID:   1,
 	})
+	if err != ErrProductSKURequired {
+		t.Fatalf("create card secret batch error want %v got %v", ErrProductSKURequired, err)
+	}
+	if batch != nil || created != 0 {
+		t.Fatalf("batch should not be created when sku is omitted for auto multi-sku product")
+	}
+}
+
+func TestCreateCardSecretBatchAutoSingleActiveFallsBackToOnlyActiveSKU(t *testing.T) {
+	db := setupCardSecretServiceTestDB(t)
+
+	product := &models.Product{
+		CategoryID:      1,
+		Slug:            "card-secret-product-single-active",
+		TitleJSON:       models.JSON{"zh-CN": "卡密商品"},
+		PriceAmount:     models.NewMoneyFromDecimal(decimal.NewFromInt(20)),
+		PurchaseType:    constants.ProductPurchaseMember,
+		FulfillmentType: constants.FulfillmentTypeAuto,
+		IsActive:        true,
+	}
+	if err := db.Create(product).Error; err != nil {
+		t.Fatalf("create product failed: %v", err)
+	}
+
+	defaultSKU := &models.ProductSKU{
+		ProductID:   product.ID,
+		SKUCode:     models.DefaultSKUCode,
+		PriceAmount: models.NewMoneyFromDecimal(decimal.NewFromInt(20)),
+		IsActive:    false,
+	}
+	if err := db.Create(defaultSKU).Error; err != nil {
+		t.Fatalf("create default sku failed: %v", err)
+	}
+	if err := db.Model(defaultSKU).Update("is_active", false).Error; err != nil {
+		t.Fatalf("disable default sku failed: %v", err)
+	}
+	onlyActiveSKU := &models.ProductSKU{
+		ProductID:   product.ID,
+		SKUCode:     "PRO",
+		PriceAmount: models.NewMoneyFromDecimal(decimal.NewFromInt(30)),
+		IsActive:    true,
+	}
+	if err := db.Create(onlyActiveSKU).Error; err != nil {
+		t.Fatalf("create active sku failed: %v", err)
+	}
+
+	svc := NewCardSecretService(
+		repository.NewCardSecretRepository(db),
+		repository.NewCardSecretBatchRepository(db),
+		repository.NewProductRepository(db),
+		repository.NewProductSKURepository(db),
+	)
+
+	batch, created, err := svc.CreateCardSecretBatch(CreateCardSecretBatchInput{
+		ProductID: product.ID,
+		Secrets:   []string{"AAA-101", "AAA-102"},
+		Source:    constants.CardSecretSourceManual,
+		AdminID:   1,
+	})
 	if err != nil {
 		t.Fatalf("create card secret batch failed: %v", err)
 	}
 	if created != 2 {
 		t.Fatalf("created count want 2 got %d", created)
 	}
-	if batch.SKUID != defaultSKU.ID {
-		t.Fatalf("batch sku_id want default %d got %d", defaultSKU.ID, batch.SKUID)
-	}
-
-	var secretRows []models.CardSecret
-	if err := db.Where("batch_id = ?", batch.ID).Find(&secretRows).Error; err != nil {
-		t.Fatalf("query card secrets failed: %v", err)
-	}
-	if len(secretRows) != 2 {
-		t.Fatalf("secret rows want 2 got %d", len(secretRows))
-	}
-	for _, row := range secretRows {
-		if row.SKUID != defaultSKU.ID {
-			t.Fatalf("secret sku_id want default %d got %d", defaultSKU.ID, row.SKUID)
-		}
+	if batch.SKUID != onlyActiveSKU.ID {
+		t.Fatalf("batch sku_id want active %d got %d", onlyActiveSKU.ID, batch.SKUID)
 	}
 }
 

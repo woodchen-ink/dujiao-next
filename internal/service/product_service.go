@@ -224,14 +224,18 @@ func (s *ProductService) Create(input CreateProductInput) (*models.Product, erro
 	if err := s.repo.Transaction(func(tx *gorm.DB) error {
 		productRepo := s.repo.WithTx(tx)
 		var skuRepo repository.ProductSKURepository
+		var cardSecretRepo repository.CardSecretRepository
 		if s.productSKURepo != nil {
 			skuRepo = s.productSKURepo.WithTx(tx)
+		}
+		if s.cardSecretRepo != nil {
+			cardSecretRepo = s.cardSecretRepo.WithTx(tx)
 		}
 		if err := productRepo.Create(&product); err != nil {
 			return err
 		}
 		if len(normalizedSKUs) > 0 {
-			return applyProductSKUs(skuRepo, product.ID, normalizedSKUs)
+			return applyProductSKUsWithStockGuard(skuRepo, cardSecretRepo, product.ID, fulfillmentType, normalizedSKUs)
 		}
 		return syncSingleProductSKU(skuRepo, product.ID, priceAmount, manualStockTotal, true)
 	}); err != nil {
@@ -350,14 +354,23 @@ func (s *ProductService) Update(id string, input CreateProductInput) (*models.Pr
 	if err := s.repo.Transaction(func(tx *gorm.DB) error {
 		productRepo := s.repo.WithTx(tx)
 		var skuRepo repository.ProductSKURepository
+		var cardSecretRepo repository.CardSecretRepository
 		if s.productSKURepo != nil {
 			skuRepo = s.productSKURepo.WithTx(tx)
+		}
+		if s.cardSecretRepo != nil {
+			cardSecretRepo = s.cardSecretRepo.WithTx(tx)
+		}
+		if len(normalizedSKUs) > 0 {
+			if err := applyProductSKUsWithStockGuard(skuRepo, cardSecretRepo, product.ID, fulfillmentType, normalizedSKUs); err != nil {
+				return err
+			}
 		}
 		if err := productRepo.Update(product); err != nil {
 			return err
 		}
 		if len(normalizedSKUs) > 0 {
-			return applyProductSKUs(skuRepo, product.ID, normalizedSKUs)
+			return nil
 		}
 		return syncSingleProductSKU(skuRepo, product.ID, priceAmount, product.ManualStockTotal, true)
 	}); err != nil {
@@ -542,6 +555,16 @@ func normalizeProductSKUInputs(inputs []ProductSKUInput, fulfillmentType string,
 }
 
 func applyProductSKUs(skuRepo repository.ProductSKURepository, productID uint, rows []normalizedProductSKU) error {
+	return applyProductSKUsWithStockGuard(skuRepo, nil, productID, "", rows)
+}
+
+func applyProductSKUsWithStockGuard(
+	skuRepo repository.ProductSKURepository,
+	cardSecretRepo repository.CardSecretRepository,
+	productID uint,
+	fulfillmentType string,
+	rows []normalizedProductSKU,
+) error {
 	if skuRepo == nil || productID == 0 || len(rows) == 0 {
 		return ErrProductSKUInvalid
 	}
@@ -554,6 +577,9 @@ func applyProductSKUs(skuRepo repository.ProductSKURepository, productID uint, r
 	for _, row := range existingRows {
 		existingByID[row.ID] = row
 		existingByCode[strings.ToLower(strings.TrimSpace(row.SKUCode))] = row
+	}
+	if err := ensureAutoSKUCardSecretStockSafe(cardSecretRepo, productID, fulfillmentType, existingRows, rows, existingByID, existingByCode); err != nil {
+		return err
 	}
 
 	kept := make(map[uint]struct{}, len(rows))
@@ -618,6 +644,61 @@ func applyProductSKUs(skuRepo repository.ProductSKURepository, productID uint, r
 		existing.IsActive = false
 		if err := skuRepo.Update(&existing); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func ensureAutoSKUCardSecretStockSafe(
+	cardSecretRepo repository.CardSecretRepository,
+	productID uint,
+	fulfillmentType string,
+	existingRows []models.ProductSKU,
+	rows []normalizedProductSKU,
+	existingByID map[uint]models.ProductSKU,
+	existingByCode map[string]models.ProductSKU,
+) error {
+	if cardSecretRepo == nil || productID == 0 || strings.TrimSpace(fulfillmentType) != constants.FulfillmentTypeAuto {
+		return nil
+	}
+
+	nextActive := make(map[uint]bool, len(existingRows))
+	kept := make(map[uint]struct{}, len(rows))
+	for _, row := range rows {
+		if row.ID > 0 {
+			existing, ok := existingByID[row.ID]
+			if !ok {
+				return ErrProductSKUInvalid
+			}
+			nextActive[existing.ID] = row.IsActive
+			kept[existing.ID] = struct{}{}
+			continue
+		}
+
+		codeKey := strings.ToLower(strings.TrimSpace(row.SKUCode))
+		if existing, ok := existingByCode[codeKey]; ok {
+			nextActive[existing.ID] = row.IsActive
+			kept[existing.ID] = struct{}{}
+		}
+	}
+
+	for _, existing := range existingRows {
+		if _, ok := nextActive[existing.ID]; !ok {
+			nextActive[existing.ID] = false
+		}
+		if _, ok := kept[existing.ID]; !ok {
+			nextActive[existing.ID] = false
+		}
+		if !existing.IsActive || nextActive[existing.ID] {
+			continue
+		}
+		total, available, used, err := cardSecretRepo.CountByProduct(productID, existing.ID)
+		if err != nil {
+			return err
+		}
+		outstanding := total - used
+		if available > 0 || outstanding > 0 {
+			return ErrProductSKUHasCardSecretStock
 		}
 	}
 	return nil

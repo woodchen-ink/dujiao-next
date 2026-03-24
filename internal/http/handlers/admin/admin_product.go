@@ -187,6 +187,10 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 			shared.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
 			return
 		}
+		if errors.Is(err, service.ErrProductSKUHasCardSecretStock) {
+			shared.RespondError(c, response.CodeBadRequest, "error.product_sku_has_card_secret_stock", nil)
+			return
+		}
 		shared.RespondError(c, response.CodeInternal, "error.product_create_failed", err)
 		return
 	}
@@ -259,6 +263,10 @@ func (h *Handler) UpdateProduct(c *gin.Context) {
 		}
 		if errors.Is(err, service.ErrProductSKUInvalid) {
 			shared.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
+			return
+		}
+		if errors.Is(err, service.ErrProductSKUHasCardSecretStock) {
+			shared.RespondError(c, response.CodeBadRequest, "error.product_sku_has_card_secret_stock", nil)
 			return
 		}
 		shared.RespondError(c, response.CodeInternal, "error.product_update_failed", err)

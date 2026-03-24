@@ -517,6 +517,24 @@ func (s *CardSecretService) resolveCardSecretSKU(productID, rawSKUID uint) (*mod
 	if productID == 0 || s.productSKURepo == nil {
 		return nil, ErrProductSKUInvalid
 	}
+	product, err := s.productRepo.GetByID(strings.TrimSpace(strconv.FormatUint(uint64(productID), 10)))
+	if err != nil {
+		return nil, err
+	}
+	if product == nil {
+		return nil, ErrProductNotFound
+	}
+	skus, err := s.productSKURepo.ListByProduct(productID, false)
+	if err != nil {
+		return nil, err
+	}
+	activeSKUs := make([]models.ProductSKU, 0, len(skus))
+	for _, sku := range skus {
+		if !sku.IsActive {
+			continue
+		}
+		activeSKUs = append(activeSKUs, sku)
+	}
 	if rawSKUID > 0 {
 		sku, err := s.productSKURepo.GetByID(rawSKUID)
 		if err != nil {
@@ -525,7 +543,20 @@ func (s *CardSecretService) resolveCardSecretSKU(productID, rawSKUID uint) (*mod
 		if sku == nil || sku.ProductID != productID {
 			return nil, ErrProductSKUInvalid
 		}
+		if strings.TrimSpace(product.FulfillmentType) == constants.FulfillmentTypeAuto && !sku.IsActive {
+			return nil, ErrProductSKUInvalid
+		}
 		return sku, nil
+	}
+
+	if strings.TrimSpace(product.FulfillmentType) == constants.FulfillmentTypeAuto {
+		switch len(activeSKUs) {
+		case 0:
+		case 1:
+			return &activeSKUs[0], nil
+		default:
+			return nil, ErrProductSKURequired
+		}
 	}
 
 	defaultSKU, err := s.productSKURepo.GetByProductAndCode(productID, models.DefaultSKUCode)
@@ -534,11 +565,6 @@ func (s *CardSecretService) resolveCardSecretSKU(productID, rawSKUID uint) (*mod
 	}
 	if defaultSKU != nil {
 		return defaultSKU, nil
-	}
-
-	skus, err := s.productSKURepo.ListByProduct(productID, false)
-	if err != nil {
-		return nil, err
 	}
 	if len(skus) == 1 {
 		return &skus[0], nil

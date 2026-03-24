@@ -13,6 +13,7 @@ type ProductMappingRepository interface {
 	GetByID(id uint) (*models.ProductMapping, error)
 	GetByLocalProductID(productID uint) (*models.ProductMapping, error)
 	GetByConnectionAndUpstreamID(connectionID, upstreamProductID uint) (*models.ProductMapping, error)
+	WithTx(tx *gorm.DB) ProductMappingRepository
 	Create(mapping *models.ProductMapping) error
 	Update(mapping *models.ProductMapping) error
 	Delete(id uint) error
@@ -36,6 +37,10 @@ type GormProductMappingRepository struct {
 // NewProductMappingRepository 创建商品映射仓库
 func NewProductMappingRepository(db *gorm.DB) *GormProductMappingRepository {
 	return &GormProductMappingRepository{db: db}
+}
+
+func (r *GormProductMappingRepository) WithTx(tx *gorm.DB) ProductMappingRepository {
+	return &GormProductMappingRepository{db: tx}
 }
 
 func (r *GormProductMappingRepository) GetByID(id uint) (*models.ProductMapping, error) {

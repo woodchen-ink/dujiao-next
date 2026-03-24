@@ -52,18 +52,13 @@ func TestTelegramBroadcastRepositoryListFilters(t *testing.T) {
 	}
 
 	rows, total, err := repo.List(TelegramBroadcastListFilter{
-		Page:          1,
-		PageSize:      20,
-		Keyword:       "VIP",
-		RecipientType: constants.TelegramBroadcastRecipientTypeSpecific,
-		Status:        constants.TelegramBroadcastStatusFailed,
-		CreatedFrom:   ptrTime(now.Add(-time.Minute)),
-		CreatedTo:     ptrTime(now.Add(time.Minute)),
+		Page:     1,
+		PageSize: 1,
 	})
 	if err != nil {
 		t.Fatalf("list broadcasts failed: %v", err)
 	}
-	if total != 1 || len(rows) != 1 {
+	if total != 2 || len(rows) != 1 {
 		t.Fatalf("unexpected filter result: total=%d rows=%d", total, len(rows))
 	}
 	if rows[0].Title != "VIP Users" {

@@ -14,6 +14,7 @@ type SKUMappingRepository interface {
 	GetByLocalSKUID(skuID uint) (*models.SKUMapping, error)
 	GetByMappingAndUpstreamSKUID(productMappingID, upstreamSKUID uint) (*models.SKUMapping, error)
 	ListByProductMapping(productMappingID uint) ([]models.SKUMapping, error)
+	WithTx(tx *gorm.DB) SKUMappingRepository
 	Create(mapping *models.SKUMapping) error
 	Update(mapping *models.SKUMapping) error
 	Delete(id uint) error
@@ -29,6 +30,10 @@ type GormSKUMappingRepository struct {
 // NewSKUMappingRepository 创建 SKU 映射仓库
 func NewSKUMappingRepository(db *gorm.DB) *GormSKUMappingRepository {
 	return &GormSKUMappingRepository{db: db}
+}
+
+func (r *GormSKUMappingRepository) WithTx(tx *gorm.DB) SKUMappingRepository {
+	return &GormSKUMappingRepository{db: tx}
 }
 
 func (r *GormSKUMappingRepository) GetByID(id uint) (*models.SKUMapping, error) {
