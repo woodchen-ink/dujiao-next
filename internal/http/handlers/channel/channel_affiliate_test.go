@@ -73,7 +73,7 @@ func setupChannelAffiliateHandlerTest(t *testing.T) (*gorm.DB, *httptest.Server)
 	}
 
 	affiliateSvc := service.NewAffiliateService(affiliateRepo, userRepo, orderRepo, nil, settingSvc)
-	userAuthSvc := service.NewUserAuthService(&config.Config{}, userRepo, identityRepo, emailVerifyRepo, nil, nil)
+	userAuthSvc := service.NewUserAuthService(&config.Config{}, userRepo, identityRepo, emailVerifyRepo, nil, nil, nil)
 
 	handler := New(&provider.Container{
 		UserRepo:              userRepo,

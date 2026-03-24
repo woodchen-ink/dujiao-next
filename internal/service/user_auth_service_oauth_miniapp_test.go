@@ -47,6 +47,7 @@ func TestLoginWithTelegramMiniAppCreatesUserIdentityAndToken(t *testing.T) {
 		repository.NewUserOAuthIdentityRepository(db),
 		repository.NewEmailVerifyCodeRepository(db),
 		nil,
+		nil,
 		telegramSvc,
 	)
 
