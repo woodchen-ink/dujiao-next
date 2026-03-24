@@ -103,11 +103,11 @@ func (r *GormCardSecretRepository) buildListQuery(filter CardSecretListFilter) *
 		query = query.Where("card_secrets.batch_id = ?", filter.BatchID)
 	}
 	if secret := strings.TrimSpace(filter.Secret); secret != "" {
-		query = query.Where("card_secrets.secret LIKE ?", "%"+secret+"%")
+		query = query.Where("LOWER(card_secrets.secret) LIKE LOWER(?)", "%"+secret+"%")
 	}
 	if batchNo := strings.TrimSpace(filter.BatchNo); batchNo != "" {
 		query = query.Joins("LEFT JOIN card_secret_batches ON card_secret_batches.id = card_secrets.batch_id").
-			Where("card_secret_batches.batch_no LIKE ?", "%"+batchNo+"%")
+			Where("LOWER(card_secret_batches.batch_no) LIKE LOWER(?)", "%"+batchNo+"%")
 	}
 	return query
 }
