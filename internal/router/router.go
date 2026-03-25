@@ -92,6 +92,7 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 		guest := apiV1.Group("/guest")
 		{
 			guest.POST("/orders", publicHandler.CreateGuestOrder)
+			guest.POST("/orders/create-and-pay", publicHandler.CreateGuestOrderAndPay)
 			guest.POST("/orders/preview", publicHandler.PreviewGuestOrder)
 			guest.GET("/orders", publicHandler.ListGuestOrders)
 			guest.GET("/orders/:id", publicHandler.GetGuestOrder)
@@ -130,6 +131,7 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 			user.POST("/cart/items", publicHandler.UpsertCartItem)
 			user.DELETE("/cart/items/:product_id", publicHandler.DeleteCartItem)
 			user.POST("/orders", publicHandler.CreateOrder)
+			user.POST("/orders/create-and-pay", publicHandler.CreateOrderAndPay)
 			user.POST("/orders/preview", publicHandler.PreviewOrder)
 			user.GET("/orders", publicHandler.ListOrders)
 			user.GET("/orders/:id", publicHandler.GetOrder)

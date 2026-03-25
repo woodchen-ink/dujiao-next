@@ -718,6 +718,115 @@ func (h *Handler) CreateGuestOrder(c *gin.Context) {
 	response.Success(c, order)
 }
 
+// CreateGuestOrderAndPayRequest 游客创建订单并发起支付请求
+type CreateGuestOrderAndPayRequest struct {
+	Email               string                       `json:"email" binding:"required"`
+	OrderPassword       string                       `json:"order_password" binding:"required"`
+	Items               []OrderItemRequest           `json:"items" binding:"required"`
+	CouponCode          string                       `json:"coupon_code"`
+	AffiliateCode       string                       `json:"affiliate_code"`
+	AffiliateVisitorKey string                       `json:"affiliate_visitor_key"`
+	ManualFormData      map[string]models.JSON       `json:"manual_form_data"`
+	CaptchaPayload      shared.CaptchaPayloadRequest `json:"captcha_payload"`
+	ChannelID           uint                         `json:"channel_id"`
+}
+
+// CreateGuestOrderAndPay 游客创建订单并发起支付（合并接口）
+func (h *Handler) CreateGuestOrderAndPay(c *gin.Context) {
+	var req CreateGuestOrderAndPayRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		shared.RespondBindError(c, err)
+		return
+	}
+	if h.CaptchaService != nil {
+		if captchaErr := h.CaptchaService.Verify(constants.CaptchaSceneGuestCreateOrder, req.CaptchaPayload.ToServicePayload(), c.ClientIP()); captchaErr != nil {
+			switch {
+			case errors.Is(captchaErr, service.ErrCaptchaRequired):
+				shared.RespondError(c, response.CodeBadRequest, "error.captcha_required", nil)
+				return
+			case errors.Is(captchaErr, service.ErrCaptchaInvalid):
+				shared.RespondError(c, response.CodeBadRequest, "error.captcha_invalid", nil)
+				return
+			case errors.Is(captchaErr, service.ErrCaptchaConfigInvalid):
+				shared.RespondError(c, response.CodeInternal, "error.captcha_config_invalid", captchaErr)
+				return
+			default:
+				shared.RespondError(c, response.CodeInternal, "error.captcha_verify_failed", captchaErr)
+				return
+			}
+		}
+	}
+	var items []service.CreateOrderItem
+	for _, item := range req.Items {
+		items = append(items, service.CreateOrderItem{
+			ProductID:       item.ProductID,
+			SKUID:           item.SKUID,
+			Quantity:        item.Quantity,
+			FulfillmentType: item.FulfillmentType,
+		})
+	}
+	order, err := h.OrderService.CreateGuestOrder(service.CreateGuestOrderInput{
+		Email:               req.Email,
+		OrderPassword:       req.OrderPassword,
+		Locale:              i18n.ResolveLocale(c),
+		Items:               items,
+		CouponCode:          req.CouponCode,
+		AffiliateCode:       req.AffiliateCode,
+		AffiliateVisitorKey: req.AffiliateVisitorKey,
+		ClientIP:            c.ClientIP(),
+		ManualFormData:      req.ManualFormData,
+	})
+	if err != nil {
+		respondGuestOrderCreateError(c, err)
+		return
+	}
+	order.MaskUpstreamFulfillmentType()
+
+	// 如果未指定支付渠道，仅返回订单
+	if req.ChannelID == 0 {
+		response.Success(c, gin.H{
+			"order":    order,
+			"order_no": order.OrderNo,
+		})
+		return
+	}
+
+	result, err := h.PaymentService.CreatePayment(service.CreatePaymentInput{
+		OrderID:    order.ID,
+		ChannelID:  req.ChannelID,
+		UseBalance: false,
+		ClientIP:   c.ClientIP(),
+		Context:    c.Request.Context(),
+	})
+	if err != nil {
+		resp := gin.H{
+			"order":         order,
+			"order_no":      order.OrderNo,
+			"payment_error": err.Error(),
+		}
+		response.Success(c, resp)
+		return
+	}
+
+	resp := gin.H{
+		"order":              order,
+		"order_no":           order.OrderNo,
+		"order_paid":         result.OrderPaid,
+		"wallet_paid_amount": result.WalletPaidAmount,
+		"online_pay_amount":  result.OnlinePayAmount,
+	}
+	if result.Payment != nil {
+		resp["payment_id"] = result.Payment.ID
+		resp["provider_type"] = result.Payment.ProviderType
+		resp["channel_type"] = result.Payment.ChannelType
+		resp["interaction_mode"] = result.Payment.InteractionMode
+		resp["pay_url"] = result.Payment.PayURL
+		resp["qr_code"] = result.Payment.QRCode
+		resp["expires_at"] = result.Payment.ExpiredAt
+	}
+	response.Success(c, resp)
+}
+
 // PreviewGuestOrder 游客订单金额预览
 func (h *Handler) PreviewGuestOrder(c *gin.Context) {
 	var req CreateGuestOrderRequest
@@ -926,12 +1035,16 @@ func (h *Handler) CreateGuestPayment(c *gin.Context) {
 	}
 	if result.Payment != nil {
 		resp["payment_id"] = result.Payment.ID
+		resp["channel_id"] = result.Payment.ChannelID
 		resp["provider_type"] = result.Payment.ProviderType
 		resp["channel_type"] = result.Payment.ChannelType
 		resp["interaction_mode"] = result.Payment.InteractionMode
 		resp["pay_url"] = result.Payment.PayURL
 		resp["qr_code"] = result.Payment.QRCode
 		resp["expires_at"] = result.Payment.ExpiredAt
+	}
+	if result.Channel != nil {
+		resp["channel_name"] = result.Channel.Name
 	}
 	response.Success(c, resp)
 }
@@ -1051,6 +1164,7 @@ func (h *Handler) GetGuestLatestPayment(c *gin.Context) {
 		"payment_id":       payment.ID,
 		"order_id":         payment.OrderID,
 		"channel_id":       payment.ChannelID,
+		"channel_name":     payment.ChannelName,
 		"provider_type":    payment.ProviderType,
 		"channel_type":     payment.ChannelType,
 		"interaction_mode": payment.InteractionMode,

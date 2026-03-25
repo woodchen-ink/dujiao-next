@@ -20,7 +20,6 @@ type PaymentRepository interface {
 	GetLatestByProviderRef(providerRef string) (*models.Payment, error)
 	ListByOrderID(orderID uint) ([]models.Payment, error)
 	GetLatestPendingByOrder(orderID uint, now time.Time) (*models.Payment, error)
-	GetLatestPendingByOrderChannel(orderID uint, channelID uint, now time.Time) (*models.Payment, error)
 	ListAdmin(filter PaymentListFilter) ([]models.Payment, int64, error)
 	Transaction(fn func(tx *gorm.DB) error) error
 	WithTx(tx *gorm.DB) *GormPaymentRepository
@@ -107,11 +106,14 @@ func (r *GormPaymentRepository) ListByOrderID(orderID uint) ([]models.Payment, e
 // GetLatestPendingByOrder 获取订单最新待支付记录
 func (r *GormPaymentRepository) GetLatestPendingByOrder(orderID uint, now time.Time) (*models.Payment, error) {
 	var payment models.Payment
-	result := r.db.Where("order_id = ? AND status IN ? AND (expired_at IS NULL OR expired_at > ?) AND ((pay_url IS NOT NULL AND pay_url <> '') OR (qr_code IS NOT NULL AND qr_code <> ''))",
-		orderID,
-		[]string{constants.PaymentStatusInitiated, constants.PaymentStatusPending},
-		now,
-	).Order("id desc").Limit(1).Find(&payment)
+	result := r.db.
+		Select("payments.*, payment_channels.name AS channel_name").
+		Joins("LEFT JOIN payment_channels ON payment_channels.id = payments.channel_id AND payment_channels.deleted_at IS NULL").
+		Where("payments.order_id = ? AND payments.status IN ? AND (payments.expired_at IS NULL OR payments.expired_at > ?) AND ((payments.pay_url IS NOT NULL AND payments.pay_url <> '') OR (payments.qr_code IS NOT NULL AND payments.qr_code <> ''))",
+			orderID,
+			[]string{constants.PaymentStatusInitiated, constants.PaymentStatusPending},
+			now,
+		).Order("payments.id desc").Limit(1).Find(&payment)
 	if result.Error != nil {
 		return nil, result.Error
 	}

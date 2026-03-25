@@ -112,6 +112,102 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 	response.Success(c, order)
 }
 
+// CreateOrderAndPayRequest 创建订单并发起支付请求
+type CreateOrderAndPayRequest struct {
+	Items               []OrderItemRequest     `json:"items" binding:"required"`
+	CouponCode          string                 `json:"coupon_code"`
+	AffiliateCode       string                 `json:"affiliate_code"`
+	AffiliateVisitorKey string                 `json:"affiliate_visitor_key"`
+	ManualFormData      map[string]models.JSON `json:"manual_form_data"`
+	ChannelID           uint                   `json:"channel_id"`
+	UseBalance          bool                   `json:"use_balance"`
+}
+
+// CreateOrderAndPay 创建订单并发起支付（合并接口）
+func (h *Handler) CreateOrderAndPay(c *gin.Context) {
+	uid, ok := shared.GetUserID(c)
+	if !ok {
+		return
+	}
+
+	var req CreateOrderAndPayRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		shared.RespondBindError(c, err)
+		return
+	}
+
+	var items []service.CreateOrderItem
+	for _, item := range req.Items {
+		items = append(items, service.CreateOrderItem{
+			ProductID:       item.ProductID,
+			SKUID:           item.SKUID,
+			Quantity:        item.Quantity,
+			FulfillmentType: item.FulfillmentType,
+		})
+	}
+
+	order, err := h.OrderService.CreateOrder(service.CreateOrderInput{
+		UserID:              uid,
+		Items:               items,
+		CouponCode:          req.CouponCode,
+		AffiliateCode:       req.AffiliateCode,
+		AffiliateVisitorKey: req.AffiliateVisitorKey,
+		ClientIP:            c.ClientIP(),
+		ManualFormData:      req.ManualFormData,
+	})
+	if err != nil {
+		respondUserOrderCreateError(c, err)
+		return
+	}
+
+	order.MaskUpstreamFulfillmentType()
+
+	// 如果未指定支付渠道且未使用余额，仅返回订单
+	if req.ChannelID == 0 && !req.UseBalance {
+		response.Success(c, gin.H{
+			"order":    order,
+			"order_no": order.OrderNo,
+		})
+		return
+	}
+
+	result, err := h.PaymentService.CreatePayment(service.CreatePaymentInput{
+		OrderID:    order.ID,
+		ChannelID:  req.ChannelID,
+		UseBalance: req.UseBalance,
+		ClientIP:   c.ClientIP(),
+		Context:    c.Request.Context(),
+	})
+	if err != nil {
+		// 订单已创建但支付失败，返回订单信息和错误
+		resp := gin.H{
+			"order":         order,
+			"order_no":      order.OrderNo,
+			"payment_error": err.Error(),
+		}
+		response.Success(c, resp)
+		return
+	}
+
+	resp := gin.H{
+		"order":              order,
+		"order_no":           order.OrderNo,
+		"order_paid":         result.OrderPaid,
+		"wallet_paid_amount": result.WalletPaidAmount,
+		"online_pay_amount":  result.OnlinePayAmount,
+	}
+	if result.Payment != nil {
+		resp["payment_id"] = result.Payment.ID
+		resp["provider_type"] = result.Payment.ProviderType
+		resp["channel_type"] = result.Payment.ChannelType
+		resp["interaction_mode"] = result.Payment.InteractionMode
+		resp["pay_url"] = result.Payment.PayURL
+		resp["qr_code"] = result.Payment.QRCode
+		resp["expires_at"] = result.Payment.ExpiredAt
+	}
+	response.Success(c, resp)
+}
+
 // ListOrders 获取订单列表
 func (h *Handler) ListOrders(c *gin.Context) {
 	uid, ok := shared.GetUserID(c)

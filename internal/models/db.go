@@ -35,7 +35,8 @@ func InitDB(driver, dsn string, pool DBPoolConfig) error {
 	switch normalized {
 	case "", "sqlite":
 		// glebarez/sqlite 是基于 modernc.org/sqlite 的纯 Go 驱动
-		dialector = sqlite.Open(dsn)
+		// 追加 PRAGMA 参数避免并发写入时 busy-spin 导致 CPU 飙升
+		dialector = sqlite.Open(appendSQLitePragmas(dsn))
 	case "postgres", "postgresql":
 		dialector = postgres.Open(dsn)
 	default:
@@ -53,7 +54,27 @@ func InitDB(driver, dsn string, pool DBPoolConfig) error {
 		return err
 	}
 	applyDBPool(sqlDB, pool)
+
+	// SQLite 额外执行 PRAGMA 确保 WAL 模式生效
+	if normalized == "" || normalized == "sqlite" {
+		DB.Exec("PRAGMA journal_mode=WAL")
+		DB.Exec("PRAGMA busy_timeout=5000")
+		DB.Exec("PRAGMA synchronous=NORMAL")
+	}
 	return nil
+}
+
+// appendSQLitePragmas 在 SQLite DSN 中追加关键 PRAGMA 参数
+func appendSQLitePragmas(dsn string) string {
+	// glebarez/sqlite 支持 ?_pragma=key=value 形式
+	sep := "?"
+	if strings.Contains(dsn, "?") {
+		sep = "&"
+	}
+	return dsn + sep +
+		"_pragma=busy_timeout(5000)" +
+		"&_pragma=journal_mode(WAL)" +
+		"&_pragma=synchronous(NORMAL)"
 }
 
 func applyDBPool(sqlDB *sql.DB, pool DBPoolConfig) {

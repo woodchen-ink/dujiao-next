@@ -82,12 +82,16 @@ func (h *Handler) CreatePayment(c *gin.Context) {
 	}
 	if result.Payment != nil {
 		resp["payment_id"] = result.Payment.ID
+		resp["channel_id"] = result.Payment.ChannelID
 		resp["provider_type"] = result.Payment.ProviderType
 		resp["channel_type"] = result.Payment.ChannelType
 		resp["interaction_mode"] = result.Payment.InteractionMode
 		resp["pay_url"] = result.Payment.PayURL
 		resp["qr_code"] = result.Payment.QRCode
 		resp["expires_at"] = result.Payment.ExpiredAt
+	}
+	if result.Channel != nil {
+		resp["channel_name"] = result.Channel.Name
 	}
 	response.Success(c, resp)
 }
@@ -184,6 +188,7 @@ func (h *Handler) GetLatestPayment(c *gin.Context) {
 		"payment_id":       payment.ID,
 		"order_id":         payment.OrderID,
 		"channel_id":       payment.ChannelID,
+		"channel_name":     payment.ChannelName,
 		"provider_type":    payment.ProviderType,
 		"channel_type":     payment.ChannelType,
 		"interaction_mode": payment.InteractionMode,

@@ -31,6 +31,7 @@ type Payment struct {
 	ExpiredAt       *time.Time     `gorm:"index" json:"expired_at"`                                 // 过期时间
 	CallbackAt      *time.Time     `gorm:"index" json:"callback_at"`                                // 回调时间
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`                                          // 软删除时间
+	ChannelName     string         `gorm:"-" json:"channel_name,omitempty"`                         // 支付渠道名称（非数据库字段，JOIN 填充）
 }
 
 // TableName 指定表名
