@@ -382,6 +382,7 @@ const (
 	SettingKeyAffiliateConfig          = "affiliate_config"
 	SettingKeyTelegramBotConfig        = "telegram_bot_config"
 	SettingKeyTelegramBotRuntimeStatus = "telegram_bot_runtime_status"
+	SettingKeyOrderEmailTemplateConfig = "order_email_template_config"
 	SettingFieldSiteCurrency           = "currency"
 	SettingFieldPaymentExpireMinutes   = "payment_expire_minutes"
 

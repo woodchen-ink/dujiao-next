@@ -287,6 +287,9 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 				authorized.PUT("/settings/notifications", adminHandler.UpdateNotificationCenterSettings)
 				authorized.GET("/settings/notifications/logs", adminHandler.ListNotificationLogs)
 				authorized.POST("/settings/notifications/test", adminHandler.TestNotificationCenterSettings)
+				authorized.GET("/settings/order-email-template", adminHandler.GetOrderEmailTemplateSettings)
+				authorized.PUT("/settings/order-email-template", adminHandler.UpdateOrderEmailTemplateSettings)
+				authorized.POST("/settings/order-email-template/reset", adminHandler.ResetOrderEmailTemplateSettings)
 				authorized.GET("/settings/affiliate", adminHandler.GetAffiliateSettings)
 				authorized.PUT("/settings/affiliate", adminHandler.UpdateAffiliateSettings)
 				authorized.PUT("/password", adminHandler.UpdateAdminPassword) // 修改密码

@@ -56,6 +56,67 @@ func (s *EmailService) SendOrderStatusEmail(toEmail string, input OrderStatusEma
 	return s.sendTextEmail(toEmail, subject, body)
 }
 
+// SendOrderStatusEmailWithTemplate 使用可配置模板发送订单状态通知
+func (s *EmailService) SendOrderStatusEmailWithTemplate(toEmail string, input OrderStatusEmailInput, locale string, tmplSetting *OrderEmailTemplateSetting) error {
+	if tmplSetting == nil {
+		return s.SendOrderStatusEmail(toEmail, input, locale)
+	}
+	subject, body := buildOrderStatusContentFromTemplate(input, locale, *tmplSetting)
+	return s.sendTextEmail(toEmail, subject, body)
+}
+
+func buildOrderStatusContentFromTemplate(input OrderStatusEmailInput, locale string, tmplSetting OrderEmailTemplateSetting) (string, string) {
+	normalized := normalizeLocale(locale)
+
+	// 根据订单状态选择场景模板
+	var sceneTmpl OrderEmailSceneTemplate
+	status := strings.ToLower(strings.TrimSpace(input.Status))
+	switch status {
+	case constants.OrderStatusPaid:
+		sceneTmpl = tmplSetting.Templates.Paid
+	case constants.OrderStatusDelivered, constants.OrderStatusCompleted:
+		if strings.TrimSpace(input.FulfillmentInfo) != "" {
+			sceneTmpl = tmplSetting.Templates.DeliveredWithContent
+		} else {
+			sceneTmpl = tmplSetting.Templates.Delivered
+		}
+	case constants.OrderStatusCanceled:
+		sceneTmpl = tmplSetting.Templates.Canceled
+	default:
+		sceneTmpl = tmplSetting.Templates.Default
+	}
+
+	localeTmpl := ResolveOrderEmailLocaleTemplate(sceneTmpl, normalized)
+
+	// 翻译状态标签
+	statusKey := "order.status." + status
+	statusLabel := i18n.T(normalized, statusKey)
+	if statusLabel == statusKey {
+		statusLabel = input.Status
+	}
+
+	variables := map[string]interface{}{
+		"order_no":         input.OrderNo,
+		"status":           statusLabel,
+		"amount":           input.Amount.String(),
+		"currency":         strings.TrimSpace(input.Currency),
+		"fulfillment_info": strings.TrimSpace(input.FulfillmentInfo),
+	}
+
+	subject := renderTemplate(localeTmpl.Subject, variables)
+	body := renderTemplate(localeTmpl.Body, variables)
+
+	// 游客订单追加提示
+	if input.IsGuest {
+		tip := strings.TrimSpace(ResolveOrderEmailGuestTip(tmplSetting.GuestTip, normalized))
+		if tip != "" {
+			body = body + "\n\n" + tip
+		}
+	}
+
+	return subject, body
+}
+
 // SendCustomEmail 发送测试邮件或自定义邮件
 func (s *EmailService) SendCustomEmail(toEmail, subject, body string) error {
 	subject = strings.TrimSpace(subject)
@@ -64,7 +125,7 @@ func (s *EmailService) SendCustomEmail(toEmail, subject, body string) error {
 	}
 	body = strings.TrimSpace(body)
 	if body == "" {
-		body = "这是一封来自 D&J Studio 的 SMTP 测试邮件，说明当前配置可正常发送。"
+		body = "这是一封来自 Dujiao-Next 的 SMTP 测试邮件，说明当前配置可正常发送。"
 	}
 	return s.sendTextEmail(toEmail, subject, body)
 }

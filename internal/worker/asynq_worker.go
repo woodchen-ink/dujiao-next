@@ -108,6 +108,15 @@ func (c *Consumer) handleOrderStatusEmail(_ context.Context, task *asynq.Task) e
 		logger.Warnw("worker_order_status_email_skip_email_service_nil", "order_id", order.ID, "order_no", order.OrderNo)
 		return nil
 	}
+	var tmplSetting *service.OrderEmailTemplateSetting
+	if c.SettingService != nil {
+		setting, tmplErr := c.SettingService.GetOrderEmailTemplateSetting()
+		if tmplErr != nil {
+			logger.Warnw("worker_order_status_email_load_template_failed", "order_id", order.ID, "error", tmplErr)
+		} else {
+			tmplSetting = &setting
+		}
+	}
 	status := strings.TrimSpace(payload.Status)
 	if status == "" {
 		status = order.Status
@@ -121,7 +130,7 @@ func (c *Consumer) handleOrderStatusEmail(_ context.Context, task *asynq.Task) e
 		FulfillmentInfo: payloadText,
 		IsGuest:         order.UserID == 0,
 	}
-	if err := c.EmailService.SendOrderStatusEmail(receiverEmail, input, locale); err != nil {
+	if err := c.EmailService.SendOrderStatusEmailWithTemplate(receiverEmail, input, locale, tmplSetting); err != nil {
 		switch {
 		case errors.Is(err, service.ErrEmailServiceDisabled):
 			logger.Debugw("worker_order_status_email_skip_email_disabled",

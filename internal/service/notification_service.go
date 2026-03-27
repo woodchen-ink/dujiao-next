@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -20,8 +19,6 @@ import (
 
 	"github.com/hibiken/asynq"
 )
-
-var notificationTemplateVarPattern = regexp.MustCompile(`\{\{\s*([a-zA-Z0-9_]+)\s*\}\}`)
 
 // NotificationEnqueueInput 通知事件入队参数
 type NotificationEnqueueInput struct {
@@ -480,23 +477,8 @@ func buildNotificationTemplateVariables(payload queue.NotificationDispatchPayloa
 	return data
 }
 
-func renderNotificationTemplate(template string, variables map[string]interface{}) string {
-	template = strings.TrimSpace(template)
-	if template == "" {
-		return ""
-	}
-	return notificationTemplateVarPattern.ReplaceAllStringFunc(template, func(matched string) string {
-		submatch := notificationTemplateVarPattern.FindStringSubmatch(matched)
-		if len(submatch) != 2 {
-			return matched
-		}
-		key := strings.TrimSpace(submatch[1])
-		value, ok := variables[key]
-		if !ok {
-			return ""
-		}
-		return strings.TrimSpace(fmt.Sprintf("%v", value))
-	})
+func renderNotificationTemplate(tmpl string, variables map[string]interface{}) string {
+	return renderTemplate(tmpl, variables)
 }
 
 func resolveNotificationLocale(locale, fallback string) string {

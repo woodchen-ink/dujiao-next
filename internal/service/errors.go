@@ -159,4 +159,5 @@ var (
 	ErrTelegramBroadcastNoRecipients   = errors.New("telegram broadcast no recipients")
 	ErrTelegramBotTokenUnavailable     = errors.New("telegram bot token unavailable")
 	ErrRegistrationDisabled            = errors.New("registration disabled")
+	ErrOrderEmailTemplateConfigInvalid = errors.New("order email template config invalid")
 )
