@@ -48,6 +48,7 @@ type CreateProductInput struct {
 	FulfillmentType      string
 	ManualStockTotal     *int
 	SKUs                 []ProductSKUInput
+	PaymentChannelIDs    []uint
 	IsAffiliateEnabled   *bool
 	IsActive             *bool
 	SortOrder            int
@@ -215,6 +216,7 @@ func (s *ProductService) Create(input CreateProductInput) (*models.Product, erro
 		ManualStockTotal:     manualStockTotal,
 		ManualStockLocked:    0,
 		ManualStockSold:      0,
+		PaymentChannelIDs:    EncodeChannelIDs(input.PaymentChannelIDs),
 		IsAffiliateEnabled:   isAffiliateEnabled,
 		IsActive:             isActive,
 		SortOrder:            input.SortOrder,
@@ -287,6 +289,7 @@ func (s *ProductService) Update(id string, input CreateProductInput) (*models.Pr
 	product.SortOrder = input.SortOrder
 	product.Images = models.StringArray(input.Images)
 	product.Tags = models.StringArray(input.Tags)
+	product.PaymentChannelIDs = EncodeChannelIDs(input.PaymentChannelIDs)
 	if input.IsActive != nil {
 		product.IsActive = *input.IsActive
 	}

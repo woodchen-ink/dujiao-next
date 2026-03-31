@@ -143,3 +143,39 @@ func (s *SettingService) GetSiteCurrency(defaultValue string) (string, error) {
 	}
 	return normalizeSiteCurrency(raw), nil
 }
+
+// GetWalletRechargeChannelIDs 获取钱包充值允许的支付渠道ID列表
+func (s *SettingService) GetWalletRechargeChannelIDs() []uint {
+	if s == nil {
+		return nil
+	}
+	value, err := s.GetByKey(constants.SettingKeyWalletConfig)
+	if err != nil || value == nil {
+		return nil
+	}
+	raw, ok := value["recharge_channel_ids"]
+	if !ok {
+		return nil
+	}
+	arr, ok := raw.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]uint, 0, len(arr))
+	for _, item := range arr {
+		switch v := item.(type) {
+		case float64:
+			if v > 0 {
+				result = append(result, uint(v))
+			}
+		case int:
+			if v > 0 {
+				result = append(result, uint(v))
+			}
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}

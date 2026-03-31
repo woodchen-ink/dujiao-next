@@ -57,5 +57,8 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	if req.Key == constants.SettingKeyNavConfig {
 		_ = cache.Del(c.Request.Context(), publicConfigCacheKey)
 	}
+	if req.Key == constants.SettingKeyWalletConfig {
+		_ = cache.Del(c.Request.Context(), publicConfigCacheKey)
+	}
 	response.Success(c, value)
 }

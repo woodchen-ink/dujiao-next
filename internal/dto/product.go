@@ -24,6 +24,9 @@ type ProductResp struct {
 	StockStatus          string             `json:"stock_status"`
 	IsSoldOut            bool               `json:"is_sold_out"`
 
+	// 支付渠道限制
+	PaymentChannelIDs []uint `json:"payment_channel_ids,omitempty"`
+
 	// 关联
 	Category CategoryResp `json:"category,omitempty"`
 	SKUs     []SKUResp    `json:"skus,omitempty"`

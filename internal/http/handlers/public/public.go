@@ -85,6 +85,7 @@ func (v *publicProductView) toProductResp() dto.ProductResp {
 		AutoStockAvailable:   v.AutoStockAvailable,
 		StockStatus:          v.StockStatus,
 		IsSoldOut:            v.IsSoldOut,
+		PaymentChannelIDs:    service.DecodeChannelIDs(v.Product.PaymentChannelIDs),
 		Category:             dto.NewCategoryResp(&v.Product.Category),
 		SKUs:                 skus,
 		PromotionID:          v.PromotionID,
@@ -149,6 +150,14 @@ func (h *Handler) GetConfig(c *gin.Context) {
 		publicChannels = append(publicChannels, ch)
 	}
 	data["payment_channels"] = publicChannels
+
+	// 钱包充值支付渠道限制
+	if h.SettingService != nil {
+		walletRechargeChannelIDs := h.SettingService.GetWalletRechargeChannelIDs()
+		if len(walletRechargeChannelIDs) > 0 {
+			data["wallet_recharge_channel_ids"] = walletRechargeChannelIDs
+		}
+	}
 
 	if h.CaptchaService != nil {
 		publicCaptcha, captchaErr := h.CaptchaService.GetPublicSetting()
@@ -748,7 +757,9 @@ func (h *Handler) CreateGuestOrder(c *gin.Context) {
 		respondGuestOrderCreateError(c, err)
 		return
 	}
-	response.Success(c, dto.NewOrderDetail(order))
+	orderDetail := dto.NewOrderDetail(order)
+	h.enrichOrderWithAllowedChannels(order, &orderDetail)
+	response.Success(c, orderDetail)
 }
 
 // CreateGuestOrderAndPayRequest 游客创建订单并发起支付请求
@@ -814,6 +825,7 @@ func (h *Handler) CreateGuestOrderAndPay(c *gin.Context) {
 		return
 	}
 	orderResp := dto.NewOrderDetail(order)
+	h.enrichOrderWithAllowedChannels(order, &orderResp)
 
 	// 如果未指定支付渠道，仅返回订单
 	if req.ChannelID == 0 {
@@ -973,7 +985,9 @@ func (h *Handler) GetGuestOrderByOrderNo(c *gin.Context) {
 		shared.RespondError(c, response.CodeInternal, "error.order_fetch_failed", err)
 		return
 	}
-	response.Success(c, dto.NewOrderDetailTruncated(order))
+	orderDetail := dto.NewOrderDetailTruncated(order)
+	h.enrichOrderWithAllowedChannels(order, &orderDetail)
+	response.Success(c, orderDetail)
 }
 
 // DownloadGuestFulfillment 下载订单交付内容（游客）

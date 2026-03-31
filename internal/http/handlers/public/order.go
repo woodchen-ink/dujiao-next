@@ -15,6 +15,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// enrichOrderWithAllowedChannels 为订单详情附加允许的支付渠道ID
+func (h *Handler) enrichOrderWithAllowedChannels(order *models.Order, detail *dto.OrderDetail) {
+	if h.PaymentService == nil || order == nil {
+		return
+	}
+	allItems := order.Items
+	for _, child := range order.Children {
+		allItems = append(allItems, child.Items...)
+	}
+	allowed := h.PaymentService.GetAllowedChannelIDsForOrder(allItems)
+	if len(allowed) > 0 {
+		detail.AllowedPaymentChannelIDs = allowed
+	}
+}
+
 // OrderItemRequest 订单项请求
 type OrderItemRequest struct {
 	ProductID       uint   `json:"product_id" binding:"required"`
@@ -109,7 +124,9 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.NewOrderDetail(order))
+	orderDetail := dto.NewOrderDetail(order)
+	h.enrichOrderWithAllowedChannels(order, &orderDetail)
+	response.Success(c, orderDetail)
 }
 
 // CreateOrderAndPayRequest 创建订单并发起支付请求
@@ -161,6 +178,7 @@ func (h *Handler) CreateOrderAndPay(c *gin.Context) {
 	}
 
 	orderResp := dto.NewOrderDetail(order)
+	h.enrichOrderWithAllowedChannels(order, &orderResp)
 
 	// 如果未指定支付渠道且未使用余额，仅返回订单
 	if req.ChannelID == 0 && !req.UseBalance {
@@ -260,7 +278,9 @@ func (h *Handler) GetOrderByOrderNo(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.NewOrderDetailTruncated(order))
+	orderDetail := dto.NewOrderDetailTruncated(order)
+	h.enrichOrderWithAllowedChannels(order, &orderDetail)
+	response.Success(c, orderDetail)
 }
 
 // CancelOrder 用户取消订单

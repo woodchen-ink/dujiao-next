@@ -104,6 +104,7 @@ type CreateProductRequest struct {
 	FulfillmentType     string                 `json:"fulfillment_type"`
 	ManualStockTotal    *int                   `json:"manual_stock_total"`
 	SKUs                []ProductSKURequest    `json:"skus"`
+	PaymentChannelIDs   []uint                 `json:"payment_channel_ids"`
 	IsAffiliateEnabled  *bool                  `json:"is_affiliate_enabled"`
 	IsActive            *bool                  `json:"is_active"`
 	SortOrder           int                    `json:"sort_order"`
@@ -154,6 +155,7 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 		FulfillmentType:      req.FulfillmentType,
 		ManualStockTotal:     req.ManualStockTotal,
 		SKUs:                 toProductSKUInputs(req.SKUs),
+		PaymentChannelIDs:    req.PaymentChannelIDs,
 		IsAffiliateEnabled:   req.IsAffiliateEnabled,
 		IsActive:             req.IsActive,
 		SortOrder:            req.SortOrder,
@@ -229,6 +231,7 @@ func (h *Handler) UpdateProduct(c *gin.Context) {
 		FulfillmentType:      req.FulfillmentType,
 		ManualStockTotal:     req.ManualStockTotal,
 		SKUs:                 toProductSKUInputs(req.SKUs),
+		PaymentChannelIDs:    req.PaymentChannelIDs,
 		IsAffiliateEnabled:   req.IsAffiliateEnabled,
 		IsActive:             req.IsActive,
 		SortOrder:            req.SortOrder,

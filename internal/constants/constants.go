@@ -388,6 +388,8 @@ const (
 
 	SettingKeyNavConfig = "nav_config"
 
+	SettingKeyWalletConfig = "wallet_config"
+
 	SettingKeyRegistrationConfig         = "registration_config"
 	SettingFieldRegistrationEnabled      = "registration_enabled"
 	SettingFieldEmailVerificationEnabled = "email_verification_enabled"

@@ -206,12 +206,75 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 }
 
 // GetPaymentChannels GET /api/v1/channel/payment-channels
+// 可选查询参数:
+//   - order_no: 根据订单中的商品过滤允许的支付渠道
+//   - context: "recharge" 返回钱包充值允许的支付渠道
 func (h *Handler) GetPaymentChannels(c *gin.Context) {
-	channels, _, err := h.PaymentService.ListChannels(repository.PaymentChannelListFilter{
-		ActiveOnly: true,
-		Page:       1,
-		PageSize:   50,
-	})
+	contextParam := strings.TrimSpace(c.Query("context"))
+	orderNo := strings.TrimSpace(c.Query("order_no"))
+
+	var channels []models.PaymentChannel
+	var err error
+
+	if contextParam == "recharge" {
+		// 钱包充值渠道
+		channels, err = h.PaymentService.GetWalletRechargeChannels()
+	} else if orderNo != "" {
+		// 按订单商品过滤渠道
+		channelUserID := channelUserIDFromQuery(c)
+		if channelUserID == "" {
+			// 缺少 channel_user_id，无法查找订单，返回全部渠道
+			channels, _, err = h.PaymentService.ListChannels(repository.PaymentChannelListFilter{
+				ActiveOnly: true,
+				Page:       1,
+				PageSize:   50,
+			})
+		} else {
+			userID, resolveErr := h.provisionTelegramChannelUserID(service.TelegramChannelIdentityInput{ChannelUserID: channelUserID})
+			if resolveErr != nil {
+				logger.Errorw("channel_payment_channels_resolve_user", "channel_user_id", channelUserID, "error", resolveErr)
+				channels, _, err = h.PaymentService.ListChannels(repository.PaymentChannelListFilter{
+					ActiveOnly: true,
+					Page:       1,
+					PageSize:   50,
+				})
+			} else {
+				order, orderErr := h.OrderService.GetOrderByUserOrderNo(orderNo, userID)
+				if orderErr != nil || order == nil {
+					// 找不到订单，返回全部渠道
+					channels, _, err = h.PaymentService.ListChannels(repository.PaymentChannelListFilter{
+						ActiveOnly: true,
+						Page:       1,
+						PageSize:   50,
+					})
+				} else {
+					allItems := order.Items
+					for _, child := range order.Children {
+						allItems = append(allItems, child.Items...)
+					}
+					productIDSet := make(map[uint]struct{})
+					for _, item := range allItems {
+						if item.ProductID > 0 {
+							productIDSet[item.ProductID] = struct{}{}
+						}
+					}
+					productIDs := make([]uint, 0, len(productIDSet))
+					for id := range productIDSet {
+						productIDs = append(productIDs, id)
+					}
+					channels, err = h.PaymentService.GetAllowedChannelsForProducts(productIDs)
+				}
+			}
+		}
+	} else {
+		// 默认：全部活跃渠道
+		channels, _, err = h.PaymentService.ListChannels(repository.PaymentChannelListFilter{
+			ActiveOnly: true,
+			Page:       1,
+			PageSize:   50,
+		})
+	}
+
 	if err != nil {
 		logger.Errorw("channel_order_list_payment_channels", "error", err)
 		respondChannelError(c, 500, 500, "internal_error", "error.internal_error", err)
