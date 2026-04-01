@@ -38,7 +38,9 @@ func (s *ApiCredentialService) Apply(userID uint) (*models.ApiCredential, error)
 
 	if existing != nil {
 		if existing.DeletedAt.Valid {
-			resetApiCredentialForReapply(existing)
+			if err := resetApiCredentialForReapply(existing); err != nil {
+				return nil, err
+			}
 			if err := s.credRepo.UpdateAny(existing); err != nil {
 				return nil, err
 			}
@@ -52,7 +54,9 @@ func (s *ApiCredentialService) Apply(userID uint) (*models.ApiCredential, error)
 			return nil, ErrApiCredentialExists
 		case constants.ApiCredentialStatusRejected:
 			// 允许重新申请，并重置旧审批与凭证痕迹。
-			resetApiCredentialForReapply(existing)
+			if err := resetApiCredentialForReapply(existing); err != nil {
+				return nil, err
+			}
 			if err := s.credRepo.Update(existing); err != nil {
 				return nil, err
 			}
@@ -62,8 +66,13 @@ func (s *ApiCredentialService) Apply(userID uint) (*models.ApiCredential, error)
 		}
 	}
 
+	apiKey, err := generateRandomHex(32)
+	if err != nil {
+		return nil, err
+	}
 	cred := &models.ApiCredential{
 		UserID: userID,
+		ApiKey: apiKey,
 		Status: constants.ApiCredentialStatusPendingReview,
 	}
 	if err := s.credRepo.Create(cred); err != nil {
@@ -72,8 +81,12 @@ func (s *ApiCredentialService) Apply(userID uint) (*models.ApiCredential, error)
 	return cred, nil
 }
 
-func resetApiCredentialForReapply(cred *models.ApiCredential) {
-	cred.ApiKey = ""
+func resetApiCredentialForReapply(cred *models.ApiCredential) error {
+	apiKey, err := generateRandomHex(32)
+	if err != nil {
+		return err
+	}
+	cred.ApiKey = apiKey
 	cred.ApiSecret = ""
 	cred.Status = constants.ApiCredentialStatusPendingReview
 	cred.RejectReason = ""
@@ -81,6 +94,7 @@ func resetApiCredentialForReapply(cred *models.ApiCredential) {
 	cred.LastUsedAt = nil
 	cred.IsActive = false
 	cred.DeletedAt = gorm.DeletedAt{}
+	return nil
 }
 
 // Approve admin 审核通过

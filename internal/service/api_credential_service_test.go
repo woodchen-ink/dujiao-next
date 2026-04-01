@@ -88,8 +88,11 @@ func TestApiCredentialServiceApplyRestoresDeletedCredential(t *testing.T) {
 	if reapplied.Status != constants.ApiCredentialStatusPendingReview {
 		t.Fatalf("expected status %s, got %s", constants.ApiCredentialStatusPendingReview, reapplied.Status)
 	}
-	if reapplied.ApiKey != "" || reapplied.ApiSecret != "" {
-		t.Fatalf("expected api key and secret to be cleared, got key=%q secret=%q", reapplied.ApiKey, reapplied.ApiSecret)
+	if reapplied.ApiKey == "" || reapplied.ApiKey == "legacy-key" {
+		t.Fatalf("expected new api key, got %q", reapplied.ApiKey)
+	}
+	if reapplied.ApiSecret != "" {
+		t.Fatalf("expected api secret to be cleared, got %q", reapplied.ApiSecret)
 	}
 	if reapplied.RejectReason != "" {
 		t.Fatalf("expected reject reason cleared, got %q", reapplied.RejectReason)
@@ -144,8 +147,11 @@ func TestApiCredentialServiceApplyResetsRejectedCredential(t *testing.T) {
 	if reapplied.Status != constants.ApiCredentialStatusPendingReview {
 		t.Fatalf("expected status %s, got %s", constants.ApiCredentialStatusPendingReview, reapplied.Status)
 	}
-	if reapplied.ApiKey != "" || reapplied.ApiSecret != "" {
-		t.Fatalf("expected api key and secret cleared, got key=%q secret=%q", reapplied.ApiKey, reapplied.ApiSecret)
+	if reapplied.ApiKey == "" || reapplied.ApiKey == "old-key" {
+		t.Fatalf("expected new api key, got %q", reapplied.ApiKey)
+	}
+	if reapplied.ApiSecret != "" {
+		t.Fatalf("expected api secret cleared, got %q", reapplied.ApiSecret)
 	}
 	if reapplied.RejectReason != "" {
 		t.Fatalf("expected reject reason cleared, got %q", reapplied.RejectReason)
