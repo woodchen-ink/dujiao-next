@@ -119,6 +119,12 @@ func (s *MemberLevelService) ResolveMemberPrice(levelID, productID, skuID uint, 
 		return basePrice, decimal.Zero
 	}
 
+	// 检查会员等级是否启用，停用的等级不享受任何优惠
+	level, err := s.levelRepo.GetByID(levelID)
+	if err != nil || level == nil || !level.IsActive {
+		return basePrice, decimal.Zero
+	}
+
 	// 查找 SKU 级覆盖
 	if skuID > 0 {
 		skuPrice, err := s.priceRepo.GetByLevelAndProductAndSKU(levelID, productID, skuID)
@@ -142,10 +148,6 @@ func (s *MemberLevelService) ResolveMemberPrice(levelID, productID, skuID uint, 
 	}
 
 	// 使用等级折扣率
-	level, err := s.levelRepo.GetByID(levelID)
-	if err != nil || level == nil {
-		return basePrice, decimal.Zero
-	}
 	rate := level.DiscountRate.Decimal
 	if rate.LessThanOrEqual(decimal.Zero) || rate.GreaterThanOrEqual(decimal.NewFromInt(100)) {
 		return basePrice, decimal.Zero
@@ -160,6 +162,11 @@ func (s *MemberLevelService) ResolveMemberPrice(levelID, productID, skuID uint, 
 // ResolveMemberPriceForProducts 批量解析会员价（用于商品列表）
 func (s *MemberLevelService) ResolveMemberPriceForProducts(levelID uint, productIDs []uint) (map[uint][]models.MemberLevelPrice, error) {
 	if levelID == 0 || len(productIDs) == 0 {
+		return nil, nil
+	}
+	// 检查会员等级是否启用
+	level, err := s.levelRepo.GetByID(levelID)
+	if err != nil || level == nil || !level.IsActive {
 		return nil, nil
 	}
 	prices, err := s.priceRepo.ListByLevelAndProducts(levelID, productIDs)

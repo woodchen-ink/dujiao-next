@@ -247,6 +247,14 @@ func (r *GormDashboardRepository) GetOverview(startAt, endAt time.Time) (Dashboa
 		Order("id DESC").
 		Limit(1).
 		Pluck("currency", &result.Currency).Error
+	// 时间范围内无订单时，回退到最近一笔订单的币种
+	if result.Currency == "" {
+		_ = r.db.Model(&models.Order{}).
+			Where("parent_id IS NULL AND currency <> ''").
+			Order("id DESC").
+			Limit(1).
+			Pluck("currency", &result.Currency).Error
+	}
 
 	return result, nil
 }
