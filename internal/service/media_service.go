@@ -144,7 +144,7 @@ func (s *MediaService) Rename(id uint, name string) error {
 	return s.repo.Update(media)
 }
 
-// Delete 删除素材（仅软删除记录，不删物理文件）
+// Delete 删除素材（软删除记录并删除物理文件）
 func (s *MediaService) Delete(id uint) error {
 	media, err := s.repo.GetByID(id)
 	if err != nil {
@@ -153,5 +153,13 @@ func (s *MediaService) Delete(id uint) error {
 	if media == nil {
 		return ErrMediaNotFound
 	}
-	return s.repo.Delete(id)
+	if err := s.repo.Delete(id); err != nil {
+		return err
+	}
+	// 删除物理文件（Path 格式如 /uploads/product/2026/04/uuid.jpg）
+	diskPath := strings.TrimPrefix(media.Path, "/")
+	if err := os.Remove(diskPath); err != nil && !os.IsNotExist(err) {
+		logger.Warnw("media_delete_file_failed", "id", id, "path", diskPath, "error", err)
+	}
+	return nil
 }
