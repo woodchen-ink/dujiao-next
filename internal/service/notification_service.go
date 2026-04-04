@@ -244,6 +244,7 @@ func (s *NotificationService) dispatchExceptionAlertCheck(ctx context.Context, s
 		alertType := strings.TrimSpace(alert.Type)
 		data["alert_type"] = alertTypeLabelByType(alertLocale, alertType)
 		data["alert_type_label"] = data["alert_type"]
+		data["alert_type_key"] = alertType
 		data["alert_level"] = strings.TrimSpace(alert.Level)
 		data["alert_value"] = fmt.Sprintf("%d", alert.Value)
 		data["alert_threshold"] = fmt.Sprintf("%d", thresholdValueByAlertType(dashboardSetting.Alert, alertType))
@@ -590,13 +591,49 @@ func isInventoryAlertType(alertType string) bool {
 }
 
 func acquireInventoryAlertInterval(ctx context.Context, intervalSeconds int, payload queue.NotificationDispatchPayload) (bool, error) {
-	alertType := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", payload.Data["alert_type"])))
+	alertType := resolveInventoryAlertTypeKey(payload.Data)
 	if !isInventoryAlertType(alertType) {
 		return true, nil
 	}
 	intervalSeconds = normalizeNotificationInventoryAlertInterval(intervalSeconds)
 	key := "notification:inventory_interval:" + alertType
 	return cache.SetNX(ctx, key, "1", time.Duration(intervalSeconds)*time.Second)
+}
+
+func resolveInventoryAlertTypeKey(data map[string]interface{}) string {
+	if len(data) == 0 {
+		return ""
+	}
+	if key := normalizeInventoryAlertTypeKey(fmt.Sprintf("%v", data["alert_type_key"])); key != "" {
+		return key
+	}
+	return normalizeInventoryAlertTypeKey(fmt.Sprintf("%v", data["alert_type"]))
+}
+
+func normalizeInventoryAlertTypeKey(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	inventoryAlertTypes := []string{
+		constants.NotificationAlertTypeOutOfStockProducts,
+		constants.NotificationAlertTypeLowStockProducts,
+	}
+	locales := []string{
+		constants.LocaleZhCN,
+		constants.LocaleZhTW,
+		constants.LocaleEnUS,
+	}
+
+	for _, alertType := range inventoryAlertTypes {
+		if normalized == strings.ToLower(strings.TrimSpace(alertType)) {
+			return alertType
+		}
+		for _, locale := range locales {
+			label := strings.ToLower(strings.TrimSpace(alertTypeLabelByType(locale, alertType)))
+			if normalized == label {
+				return alertType
+			}
+		}
+	}
+	return ""
 }
 
 func buildInventoryAlertDispatchPayloads(
@@ -641,6 +678,7 @@ func buildInventoryAlertDispatchPayloads(
 		}
 		data["alert_type"] = alertTypeLabelByType(locale, alertType)
 		data["alert_type_label"] = data["alert_type"]
+		data["alert_type_key"] = alertType
 		data["alert_level"] = inventoryAlertLevel(alertType)
 		data["alert_value"] = fmt.Sprintf("%d", len(group))
 		data["alert_threshold"] = fmt.Sprintf("%d", thresholdValueByAlertType(dashboardSetting.Alert, alertType))

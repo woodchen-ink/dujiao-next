@@ -378,7 +378,7 @@ func TestBuildInventoryAlertDispatchPayloadsIncludesSummaryAndIgnoreRules(t *tes
 	var lowStockPayload queue.NotificationDispatchPayload
 	var outOfStockPayload queue.NotificationDispatchPayload
 	for _, item := range payloads {
-		switch fmt.Sprintf("%v", item.Data["alert_type"]) {
+		switch fmt.Sprintf("%v", item.Data["alert_type_key"]) {
 		case constants.NotificationAlertTypeLowStockProducts:
 			lowStockPayload = item
 		case constants.NotificationAlertTypeOutOfStockProducts:
@@ -424,5 +424,59 @@ func TestBuildNotificationTestVariablesIncludesSceneSpecificSamples(t *testing.T
 	}
 	if !strings.Contains(fmt.Sprintf("%v", alertVars["message"]), "30 minutes") {
 		t.Fatalf("exception test message should include interval wording, got: %v", alertVars["message"])
+	}
+}
+
+func TestResolveInventoryAlertTypeKey(t *testing.T) {
+	tests := []struct {
+		name string
+		data map[string]interface{}
+		want string
+	}{
+		{
+			name: "use code directly",
+			data: map[string]interface{}{
+				"alert_type_key": constants.NotificationAlertTypeLowStockProducts,
+				"alert_type":      "低库存商品",
+			},
+			want: constants.NotificationAlertTypeLowStockProducts,
+		},
+		{
+			name: "fallback from zh label",
+			data: map[string]interface{}{
+				"alert_type": "低库存商品",
+			},
+			want: constants.NotificationAlertTypeLowStockProducts,
+		},
+		{
+			name: "fallback from zh-tw label",
+			data: map[string]interface{}{
+				"alert_type": "低庫存商品",
+			},
+			want: constants.NotificationAlertTypeLowStockProducts,
+		},
+		{
+			name: "fallback from en label",
+			data: map[string]interface{}{
+				"alert_type": "Out of Stock",
+			},
+			want: constants.NotificationAlertTypeOutOfStockProducts,
+		},
+		{
+			name: "unknown type",
+			data: map[string]interface{}{
+				"alert_type": "something_else",
+			},
+			want: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolveInventoryAlertTypeKey(tc.data)
+			if got != tc.want {
+				t.Fatalf("resolveInventoryAlertTypeKey want %q got %q", tc.want, got)
+			}
+		})
 	}
 }
