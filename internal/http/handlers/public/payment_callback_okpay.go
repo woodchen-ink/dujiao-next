@@ -44,11 +44,14 @@ func (h *Handler) HandleOkpayCallback(c *gin.Context) bool {
 		"raw_body", callbackRawBodyForLog(body),
 	)
 
-	payment, err := h.PaymentRepo.GetLatestByProviderRef(data.OrderID)
+	payment, err := h.PaymentRepo.GetByGatewayOrderNo(data.UniqueID)
 	if err != nil || payment == nil {
-		log.Warnw("okpay_callback_payment_not_found", "order_id", data.OrderID, "error", err)
-		c.Data(200, "application/json", []byte(constants.OkpayCallbackFail))
-		return true
+		payment, err = h.PaymentRepo.GetLatestByProviderRef(data.OrderID)
+		if err != nil || payment == nil {
+			log.Warnw("okpay_callback_payment_not_found", "unique_id", data.UniqueID, "order_id", data.OrderID, "error", err)
+			c.Data(200, "application/json", []byte(constants.OkpayCallbackFail))
+			return true
+		}
 	}
 
 	channel, err := h.PaymentChannelRepo.GetByID(payment.ChannelID)

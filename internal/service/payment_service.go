@@ -720,15 +720,7 @@ func generateWalletRechargeNo() string {
 }
 
 func shouldUseGatewayOrderNo(channel *models.PaymentChannel) bool {
-	if channel == nil {
-		return false
-	}
-	switch strings.ToLower(strings.TrimSpace(channel.ProviderType)) {
-	case constants.PaymentProviderEpay, constants.PaymentProviderEpusdt, constants.PaymentProviderOkpay, constants.PaymentProviderTokenpay:
-		return true
-	default:
-		return false
-	}
+	return channel != nil
 }
 
 func buildGatewayOrderNo() string {

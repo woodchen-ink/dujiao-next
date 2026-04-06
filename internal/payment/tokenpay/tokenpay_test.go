@@ -80,12 +80,11 @@ func TestCreatePayment(t *testing.T) {
 		Currency:     "TRX",
 	}
 	result, err := CreatePayment(context.Background(), cfg, CreateInput{
-		OutOrderID:      "ORDER-3001",
-		OrderUserKey:    "10001",
-		ActualAmount:    "15.00",
-		PassThroughInfo: "payment_id=99",
-		NotifyURL:       "https://api.example.com/api/v1/payments/callback",
-		RedirectURL:     "https://shop.example.com/pay?order_no=ORDER-3001",
+		OutOrderID:   "ORDER-3001",
+		OrderUserKey: "10001",
+		ActualAmount: "15.00",
+		NotifyURL:    "https://api.example.com/api/v1/payments/callback",
+		RedirectURL:  "https://shop.example.com/pay?order_no=ORDER-3001",
 	})
 	if err != nil {
 		t.Fatalf("create payment failed: %v", err)
@@ -98,17 +97,5 @@ func TestCreatePayment(t *testing.T) {
 	}
 	if strings.TrimSpace(gotBody["Signature"].(string)) == "" {
 		t.Fatalf("signature should not be empty")
-	}
-}
-
-func TestParsePassThroughPaymentID(t *testing.T) {
-	if got := ParsePassThroughPaymentID("payment_id=123"); got != 123 {
-		t.Fatalf("payment_id from kv mismatch, got=%d", got)
-	}
-	if got := ParsePassThroughPaymentID("123"); got != 123 {
-		t.Fatalf("payment_id from raw mismatch, got=%d", got)
-	}
-	if got := ParsePassThroughPaymentID("x=1"); got != 0 {
-		t.Fatalf("payment_id should be 0, got=%d", got)
 	}
 }

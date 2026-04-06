@@ -41,13 +41,12 @@ type Config struct {
 }
 
 type CreateInput struct {
-	OutOrderID      string
-	OrderUserKey    string
-	ActualAmount    string
-	Currency        string
-	PassThroughInfo string
-	NotifyURL       string
-	RedirectURL     string
+	OutOrderID   string
+	OrderUserKey string
+	ActualAmount string
+	Currency     string
+	NotifyURL    string
+	RedirectURL  string
 }
 
 type CreateResult struct {
@@ -146,9 +145,6 @@ func CreatePayment(ctx context.Context, cfg *Config, input CreateInput) (*Create
 	if redirectURL != "" {
 		payload["RedirectUrl"] = redirectURL
 	}
-	if passThrough := strings.TrimSpace(input.PassThroughInfo); passThrough != "" {
-		payload["PassThroughInfo"] = passThrough
-	}
 	payload["Signature"] = SignPayload(payload, cfg.NotifySecret)
 
 	endpoint := cfg.GatewayURL + createOrderPath
@@ -222,31 +218,6 @@ func VerifyCallback(data *CallbackData, notifySecret string) error {
 		return ErrSignatureInvalid
 	}
 	return nil
-}
-
-func ParsePassThroughPaymentID(passThrough string) uint {
-	raw := strings.TrimSpace(passThrough)
-	if raw == "" {
-		return 0
-	}
-	if strings.Contains(raw, "=") {
-		parts := strings.Split(raw, "&")
-		for _, part := range parts {
-			kv := strings.SplitN(part, "=", 2)
-			if len(kv) != 2 {
-				continue
-			}
-			if strings.EqualFold(strings.TrimSpace(kv[0]), "payment_id") {
-				raw = strings.TrimSpace(kv[1])
-				break
-			}
-		}
-	}
-	parsed, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil || parsed == 0 {
-		return 0
-	}
-	return uint(parsed)
 }
 
 func ParsePaidAt(raw string) *time.Time {

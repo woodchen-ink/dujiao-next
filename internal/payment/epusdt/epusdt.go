@@ -66,7 +66,6 @@ type Config struct {
 // CreateInput 创建订单输入
 type CreateInput struct {
 	OrderNo   string
-	PaymentID uint
 	Amount    string
 	Name      string
 	NotifyURL string

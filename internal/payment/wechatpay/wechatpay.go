@@ -51,8 +51,6 @@ const (
 	wechatTradeStateClosed     = "CLOSED"
 	wechatTradeStateRevoked    = "REVOKED"
 	wechatTradeStatePayError   = "PAYERROR"
-
-	wechatAttachPaymentIDPrefix = "payment_id:"
 )
 
 // Config 微信官方支付配置。
@@ -74,7 +72,6 @@ type Config struct {
 // CreateInput 创建微信支付单输入。
 type CreateInput struct {
 	OrderNo     string
-	PaymentID   uint
 	Amount      string
 	Currency    string
 	Description string
@@ -182,7 +179,6 @@ func CreatePayment(ctx context.Context, cfg *Config, input CreateInput, interact
 		"mchid":        cfg.MerchantID,
 		"description":  buildDescription(input.Description, input.OrderNo),
 		"out_trade_no": input.OrderNo,
-		"attach":       strconv.FormatUint(uint64(input.PaymentID), 10),
 		"notify_url":   notifyURL,
 		"amount": map[string]interface{}{
 			"total":    amountFen,
@@ -342,32 +338,6 @@ func VerifyAndDecodeWebhook(ctx context.Context, cfg *Config, headers map[string
 		PaidAt:        parseTransactionTime(pointerString(transaction.SuccessTime)),
 		Raw:           raw,
 	}, nil
-}
-
-// ParsePaymentIDFromAttach 从 attach 字段中解析 payment_id。
-func ParsePaymentIDFromAttach(raw string) (uint, bool) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0, false
-	}
-	if decoded, err := url.QueryUnescape(raw); err == nil {
-		raw = strings.TrimSpace(decoded)
-	}
-	if strings.Contains(raw, "=") {
-		if queryValues, err := url.ParseQuery(raw); err == nil {
-			if paymentIDVal := strings.TrimSpace(queryValues.Get("payment_id")); paymentIDVal != "" {
-				raw = paymentIDVal
-			}
-		}
-	}
-	if strings.HasPrefix(raw, wechatAttachPaymentIDPrefix) {
-		raw = strings.TrimSpace(strings.TrimPrefix(raw, wechatAttachPaymentIDPrefix))
-	}
-	parsed, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil || parsed == 0 {
-		return 0, false
-	}
-	return uint(parsed), true
 }
 
 // ToPaymentStatus 将微信交易状态映射到系统支付状态。

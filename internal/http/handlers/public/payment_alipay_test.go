@@ -11,18 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestParseAlipayPaymentID(t *testing.T) {
-	if id, ok := parseAlipayPaymentID(map[string][]string{"passback_params": []string{"123"}}); !ok || id != 123 {
-		t.Fatalf("expected payment id 123, got %d %v", id, ok)
-	}
-	if id, ok := parseAlipayPaymentID(map[string][]string{"passback_params": []string{"payment_id%3D456"}}); !ok || id != 456 {
-		t.Fatalf("expected payment id 456 from encoded query, got %d %v", id, ok)
-	}
-	if _, ok := parseAlipayPaymentID(map[string][]string{"passback_params": []string{"invalid"}}); ok {
-		t.Fatalf("expected invalid passback_params to return not ok")
-	}
-}
-
 func TestMapAlipayTradeStatus(t *testing.T) {
 	if status, ok := mapAlipayTradeStatus(constants.AlipayTradeStatusSuccess); !ok || status != constants.PaymentStatusSuccess {
 		t.Fatalf("expected success mapping, got %s %v", status, ok)
@@ -40,12 +28,11 @@ func TestMapAlipayTradeStatus(t *testing.T) {
 
 func TestParseAlipayCallback(t *testing.T) {
 	form := map[string][]string{
-		"out_trade_no":    {"ORDER-1"},
-		"trade_no":        {"202602090001"},
-		"trade_status":    {"TRADE_SUCCESS"},
-		"total_amount":    {"18.80"},
-		"gmt_payment":     {"2026-02-09 23:30:00"},
-		"passback_params": []string{"1001"},
+		"out_trade_no": {"ORDER-1"},
+		"trade_no":     {"202602090001"},
+		"trade_status": {"TRADE_SUCCESS"},
+		"total_amount": {"18.80"},
+		"gmt_payment":  {"2026-02-09 23:30:00"},
 	}
 	input, err := parseAlipayCallback(form, 1001)
 	if err != nil {

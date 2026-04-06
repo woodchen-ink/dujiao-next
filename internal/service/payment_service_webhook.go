@@ -90,22 +90,20 @@ func (s *PaymentService) HandlePaypalWebhook(input WebhookCallbackInput) (*model
 		}
 	}
 
-	paypalOrderID := strings.TrimSpace(event.RelatedOrderID())
-	if paypalOrderID == "" {
-		log.Warnw("payment_webhook_related_order_missing",
-			"event_type", event.EventType,
-			"event_id", event.ID,
-		)
-		return nil, event.EventType, ErrPaymentInvalid
+	var payment *models.Payment
+	invoiceID := strings.TrimSpace(event.RelatedInvoiceID())
+	if invoiceID != "" {
+		payment, err = s.paymentRepo.GetByGatewayOrderNo(invoiceID)
+		if err != nil {
+			log.Warnw("payment_webhook_gateway_order_lookup_failed", "invoice_id", invoiceID, "error", err)
+		}
 	}
-
-	payment, err := s.paymentRepo.GetLatestByProviderRef(paypalOrderID)
-	if err != nil {
-		log.Errorw("payment_webhook_payment_lookup_failed",
-			"provider_ref", paypalOrderID,
-			"error", err,
-		)
-		return nil, event.EventType, ErrPaymentUpdateFailed
+	paypalOrderID := strings.TrimSpace(event.RelatedOrderID())
+	if payment == nil && paypalOrderID != "" {
+		payment, err = s.paymentRepo.GetLatestByProviderRef(paypalOrderID)
+		if err != nil {
+			log.Warnw("payment_webhook_provider_ref_lookup_failed", "provider_ref", paypalOrderID, "error", err)
+		}
 	}
 	if payment == nil {
 		log.Infow("payment_webhook_payment_not_found",
@@ -471,8 +469,8 @@ func (s *PaymentService) findStripeWebhookPayment(channelID uint, result *stripe
 	if result == nil {
 		return nil, ErrPaymentInvalid
 	}
-	if result.PaymentID > 0 {
-		payment, err := s.paymentRepo.GetByID(result.PaymentID)
+	if orderNo := strings.TrimSpace(result.OrderNo); orderNo != "" {
+		payment, err := s.paymentRepo.GetByGatewayOrderNo(orderNo)
 		if err != nil {
 			return nil, ErrPaymentUpdateFailed
 		}
@@ -480,12 +478,10 @@ func (s *PaymentService) findStripeWebhookPayment(channelID uint, result *stripe
 			return payment, nil
 		}
 	}
-
 	for _, ref := range []string{
 		strings.TrimSpace(result.ProviderRef),
 		strings.TrimSpace(result.SessionID),
 		strings.TrimSpace(result.PaymentIntentID),
-		strings.TrimSpace(result.OrderNo),
 	} {
 		if ref == "" {
 			continue
@@ -577,8 +573,8 @@ func (s *PaymentService) findWechatWebhookPayment(channelID uint, result *wechat
 	if result == nil {
 		return nil, ErrPaymentInvalid
 	}
-	if paymentID, ok := wechatpay.ParsePaymentIDFromAttach(result.Attach); ok {
-		payment, err := s.paymentRepo.GetByID(paymentID)
+	if orderNo := strings.TrimSpace(result.OrderNo); orderNo != "" {
+		payment, err := s.paymentRepo.GetByGatewayOrderNo(orderNo)
 		if err != nil {
 			return nil, ErrPaymentUpdateFailed
 		}
@@ -586,22 +582,14 @@ func (s *PaymentService) findWechatWebhookPayment(channelID uint, result *wechat
 			return payment, nil
 		}
 	}
-
-	for _, ref := range []string{strings.TrimSpace(result.OrderNo), strings.TrimSpace(result.TransactionID)} {
-		if ref == "" {
-			continue
-		}
-		payment, err := s.paymentRepo.GetLatestByProviderRef(ref)
+	if txID := strings.TrimSpace(result.TransactionID); txID != "" {
+		payment, err := s.paymentRepo.GetLatestByProviderRef(txID)
 		if err != nil {
 			return nil, ErrPaymentUpdateFailed
 		}
-		if payment == nil {
-			continue
+		if payment != nil && payment.ChannelID == channelID {
+			return payment, nil
 		}
-		if payment.ChannelID != channelID {
-			continue
-		}
-		return payment, nil
 	}
 	return nil, ErrPaymentNotFound
 }

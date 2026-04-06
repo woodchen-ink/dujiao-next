@@ -95,7 +95,6 @@ type Config struct {
 // CreateInput 创建 Stripe 支付输入。
 type CreateInput struct {
 	OrderNo     string
-	PaymentID   uint
 	Amount      string
 	Currency    string
 	Description string
@@ -127,7 +126,6 @@ type QueryResult struct {
 type WebhookResult struct {
 	EventID         string
 	EventType       string
-	PaymentID       uint
 	OrderNo         string
 	ProviderRef     string
 	SessionID       string
@@ -222,9 +220,7 @@ func CreatePayment(ctx context.Context, cfg *Config, input CreateInput) (*Create
 	form.Set("line_items[0][price_data][currency]", strings.ToLower(currency))
 	form.Set("line_items[0][price_data][unit_amount]", strconv.FormatInt(minorAmount, 10))
 	form.Set("line_items[0][price_data][product_data][name]", subject)
-	form.Set("metadata[payment_id]", strconv.FormatUint(uint64(input.PaymentID), 10))
 	form.Set("metadata[order_no]", orderNo)
-	form.Set("payment_intent_data[metadata][payment_id]", strconv.FormatUint(uint64(input.PaymentID), 10))
 	form.Set("payment_intent_data[metadata][order_no]", orderNo)
 	for _, pmType := range cfg.PaymentMethodTypes {
 		form.Add("payment_method_types[]", pmType)
@@ -424,7 +420,6 @@ func fillWebhookResult(result *WebhookResult, eventType string, objectRaw map[st
 	}
 	objectType := strings.TrimSpace(readString(objectRaw, "object"))
 	metadata := readMap(objectRaw, "metadata")
-	result.PaymentID = parsePaymentID(metadata)
 	result.OrderNo = strings.TrimSpace(readString(metadata, "order_no"))
 
 	switch objectType {
@@ -519,21 +514,6 @@ func mapPaymentIntentStatus(status string) string {
 	default:
 		return constants.PaymentStatusPending
 	}
-}
-
-func parsePaymentID(metadata map[string]interface{}) uint {
-	if len(metadata) == 0 {
-		return 0
-	}
-	raw := strings.TrimSpace(readString(metadata, "payment_id"))
-	if raw == "" {
-		return 0
-	}
-	id, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil || id == 0 {
-		return 0
-	}
-	return uint(id)
 }
 
 func sanitizeURLForValidation(rawURL string) string {

@@ -55,7 +55,7 @@ func TestShouldUseGatewayOrderNo(t *testing.T) {
 				ProviderType: constants.PaymentProviderOfficial,
 				ChannelType:  constants.PaymentChannelTypeWechat,
 			},
-			want: false,
+			want: true,
 		},
 	}
 
@@ -104,8 +104,8 @@ func TestResolveGatewayOrderNo(t *testing.T) {
 	}
 
 	official := &models.PaymentChannel{ProviderType: constants.PaymentProviderOfficial}
-	if got := resolveGatewayOrderNo(official, payment); got != "" {
-		t.Fatalf("official provider should not use gateway order no, got %s", got)
+	if got := resolveGatewayOrderNo(official, payment); got == "" {
+		t.Fatalf("official provider should also use gateway order no")
 	}
 }
 

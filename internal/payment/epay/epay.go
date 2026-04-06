@@ -74,7 +74,6 @@ type Config struct {
 // CreateInput 易支付下单输入
 type CreateInput struct {
 	OrderNo     string
-	PaymentID   uint
 	Amount      string
 	Subject     string
 	ChannelType string

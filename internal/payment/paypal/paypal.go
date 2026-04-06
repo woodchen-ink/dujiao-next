@@ -75,7 +75,6 @@ type Config struct {
 // CreateInput 创建 PayPal 订单输入。
 type CreateInput struct {
 	OrderNo     string
-	PaymentID   uint
 	Amount      string
 	Currency    string
 	Description string
@@ -178,7 +177,6 @@ func CreateOrder(ctx context.Context, cfg *Config, input CreateInput) (*CreateRe
 		"purchase_units": []map[string]interface{}{
 			{
 				"invoice_id": input.OrderNo,
-				"custom_id":  strconv.FormatUint(uint64(input.PaymentID), 10),
 				"amount": map[string]string{
 					"currency_code": strings.ToUpper(strings.TrimSpace(input.Currency)),
 					"value":         strings.TrimSpace(input.Amount),
@@ -368,6 +366,22 @@ func (e *WebhookEvent) RelatedOrderID() string {
 	}
 	if val := strings.TrimSpace(readString(e.Resource, "order_id")); val != "" {
 		return val
+	}
+	return ""
+}
+
+// RelatedInvoiceID 从 webhook event resource 的 purchase_units 中提取 invoice_id。
+func (e *WebhookEvent) RelatedInvoiceID() string {
+	if e == nil {
+		return ""
+	}
+	units := readArray(e.Resource, "purchase_units")
+	if len(units) > 0 {
+		if unitMap, ok := units[0].(map[string]interface{}); ok {
+			if val := strings.TrimSpace(readString(unitMap, "invoice_id")); val != "" {
+				return val
+			}
+		}
 	}
 	return ""
 }

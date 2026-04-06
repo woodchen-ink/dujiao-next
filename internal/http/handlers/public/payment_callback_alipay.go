@@ -2,7 +2,6 @@ package public
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -156,80 +155,32 @@ func isAlipayCallbackForm(form map[string][]string) bool {
 }
 
 func (h *Handler) findAlipayCallbackPayment(form map[string][]string) (*models.Payment, *models.PaymentChannel, error) {
-	if paymentID, ok := parseAlipayPaymentID(form); ok {
-		payment, channel, err := h.loadAlipayPaymentByID(paymentID)
-		if err == nil && payment != nil && channel != nil {
-			return payment, channel, nil
-		}
-	}
-
-	for _, ref := range []string{strings.TrimSpace(getFirstValue(form, "out_trade_no")), strings.TrimSpace(getFirstValue(form, "trade_no"))} {
-		if ref == "" {
-			continue
-		}
-		payment, err := h.PaymentRepo.GetLatestByProviderRef(ref)
-		if err != nil || payment == nil {
-			continue
-		}
-		channel, err := h.PaymentChannelRepo.GetByID(payment.ChannelID)
-		if err != nil || channel == nil {
-			continue
-		}
-		if strings.ToLower(strings.TrimSpace(channel.ProviderType)) != constants.PaymentProviderOfficial {
-			continue
-		}
-		if strings.ToLower(strings.TrimSpace(channel.ChannelType)) != constants.PaymentChannelTypeAlipay {
-			continue
-		}
-		return payment, channel, nil
-	}
-	return nil, nil, service.ErrPaymentNotFound
-}
-
-func (h *Handler) loadAlipayPaymentByID(paymentID uint) (*models.Payment, *models.PaymentChannel, error) {
-	if paymentID == 0 {
-		return nil, nil, service.ErrPaymentInvalid
-	}
-	payment, err := h.PaymentRepo.GetByID(paymentID)
-	if err != nil || payment == nil {
-		return nil, nil, service.ErrPaymentNotFound
-	}
-	channel, err := h.PaymentChannelRepo.GetByID(payment.ChannelID)
-	if err != nil || channel == nil {
-		return nil, nil, service.ErrPaymentChannelNotFound
-	}
-	if strings.ToLower(strings.TrimSpace(channel.ProviderType)) != constants.PaymentProviderOfficial {
-		return nil, nil, service.ErrPaymentProviderNotSupported
-	}
-	if strings.ToLower(strings.TrimSpace(channel.ChannelType)) != constants.PaymentChannelTypeAlipay {
-		return nil, nil, service.ErrPaymentProviderNotSupported
-	}
-	return payment, channel, nil
-}
-
-func parseAlipayPaymentID(form map[string][]string) (uint, bool) {
-	passback := strings.TrimSpace(getFirstValue(form, "passback_params"))
-	if passback == "" {
-		return 0, false
-	}
-	if decoded, err := url.QueryUnescape(passback); err == nil {
-		passback = strings.TrimSpace(decoded)
-	}
-	if strings.Contains(passback, "=") {
-		if queryValues, err := url.ParseQuery(passback); err == nil {
-			if paymentIDVal := strings.TrimSpace(queryValues.Get("payment_id")); paymentIDVal != "" {
-				passback = paymentIDVal
+	outTradeNo := strings.TrimSpace(getFirstValue(form, "out_trade_no"))
+	if outTradeNo != "" {
+		payment, err := h.PaymentRepo.GetByGatewayOrderNo(outTradeNo)
+		if err == nil && payment != nil {
+			channel, err := h.PaymentChannelRepo.GetByID(payment.ChannelID)
+			if err == nil && channel != nil &&
+				strings.ToLower(strings.TrimSpace(channel.ProviderType)) == constants.PaymentProviderOfficial &&
+				strings.ToLower(strings.TrimSpace(channel.ChannelType)) == constants.PaymentChannelTypeAlipay {
+				return payment, channel, nil
 			}
 		}
 	}
-	if strings.HasPrefix(passback, "payment_id:") {
-		passback = strings.TrimSpace(strings.TrimPrefix(passback, "payment_id:"))
+
+	tradeNo := strings.TrimSpace(getFirstValue(form, "trade_no"))
+	if tradeNo != "" {
+		payment, err := h.PaymentRepo.GetLatestByProviderRef(tradeNo)
+		if err == nil && payment != nil {
+			channel, err := h.PaymentChannelRepo.GetByID(payment.ChannelID)
+			if err == nil && channel != nil &&
+				strings.ToLower(strings.TrimSpace(channel.ProviderType)) == constants.PaymentProviderOfficial &&
+				strings.ToLower(strings.TrimSpace(channel.ChannelType)) == constants.PaymentChannelTypeAlipay {
+				return payment, channel, nil
+			}
+		}
 	}
-	parsed, err := shared.ParseQueryUint(passback, true)
-	if err != nil {
-		return 0, false
-	}
-	return parsed, true
+	return nil, nil, service.ErrPaymentNotFound
 }
 
 func parseAlipayCallback(form map[string][]string, paymentID uint) (*service.PaymentCallbackInput, error) {

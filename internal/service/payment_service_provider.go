@@ -89,7 +89,6 @@ func (s *PaymentService) applyProviderPayment(input CreatePaymentInput, order *m
 		subject := buildOrderSubject(order)
 		createInput := epay.CreateInput{
 			OrderNo:     providerOrderNo,
-			PaymentID:   payment.ID,
 			Amount:      payAmount,
 			Subject:     subject,
 			ChannelType: channel.ChannelType,
@@ -178,7 +177,6 @@ func (s *PaymentService) applyProviderPayment(input CreatePaymentInput, order *m
 		subject := buildOrderSubject(order)
 		result, err := epusdt.CreatePayment(gatewayCtx, cfg, epusdt.CreateInput{
 			OrderNo:   providerOrderNo,
-			PaymentID: payment.ID,
 			Amount:    payment.Amount.String(),
 			Name:      subject,
 			NotifyURL: notifyURL,
@@ -281,13 +279,12 @@ func (s *PaymentService) applyProviderPayment(input CreatePaymentInput, order *m
 			redirectURL = appendURLQuery(redirectURL, buildPaymentReturnQuery(input, order, "tokenpay_return", ""))
 		}
 		createResult, err := tokenpay.CreatePayment(gatewayCtx, cfg, tokenpay.CreateInput{
-			OutOrderID:      providerOrderNo,
-			OrderUserKey:    resolveTokenPayOrderUserKey(order),
-			ActualAmount:    payment.Amount.String(),
-			Currency:        strings.TrimSpace(cfg.Currency),
-			PassThroughInfo: fmt.Sprintf("payment_id=%d", payment.ID),
-			NotifyURL:       strings.TrimSpace(cfg.NotifyURL),
-			RedirectURL:     redirectURL,
+			OutOrderID:   providerOrderNo,
+			OrderUserKey: resolveTokenPayOrderUserKey(order),
+			ActualAmount: payment.Amount.String(),
+			Currency:     strings.TrimSpace(cfg.Currency),
+			NotifyURL:    strings.TrimSpace(cfg.NotifyURL),
+			RedirectURL:  redirectURL,
 		})
 		if err != nil {
 			switch {
@@ -335,8 +332,7 @@ func (s *PaymentService) applyProviderPayment(input CreatePaymentInput, order *m
 				payCurrency = targetCur
 			}
 			createResult, err := paypal.CreateOrder(gatewayCtx, cfg, paypal.CreateInput{
-				OrderNo:     order.OrderNo,
-				PaymentID:   payment.ID,
+				OrderNo:     providerOrderNo,
 				Amount:      payAmount,
 				Currency:    payCurrency,
 				Description: buildOrderSubject(order),
@@ -395,13 +391,11 @@ func (s *PaymentService) applyProviderPayment(input CreatePaymentInput, order *m
 			}
 			payment.Currency = payCurrency
 			createResult, err := alipay.CreatePayment(gatewayCtx, cfg, alipay.CreateInput{
-				OrderNo:        order.OrderNo,
-				PaymentID:      payment.ID,
-				Amount:         payAmount,
-				Subject:        buildOrderSubject(order),
-				NotifyURL:      cfg.NotifyURL,
-				ReturnURL:      appendURLQuery(cfg.ReturnURL, buildPaymentReturnQuery(input, order, "alipay_return", "")),
-				PassbackParams: strconv.FormatUint(uint64(payment.ID), 10),
+				OrderNo:   providerOrderNo,
+				Amount:    payAmount,
+				Subject:   buildOrderSubject(order),
+				NotifyURL: cfg.NotifyURL,
+				ReturnURL: appendURLQuery(cfg.ReturnURL, buildPaymentReturnQuery(input, order, "alipay_return", "")),
 			}, channel.InteractionMode)
 			if err != nil {
 				switch {
@@ -456,8 +450,7 @@ func (s *PaymentService) applyProviderPayment(input CreatePaymentInput, order *m
 			cfgForCreate := *cfg
 			cfgForCreate.H5RedirectURL = appendURLQuery(cfg.H5RedirectURL, buildPaymentReturnQuery(input, order, "wechat_return", ""))
 			createResult, err := wechatpay.CreatePayment(gatewayCtx, &cfgForCreate, wechatpay.CreateInput{
-				OrderNo:     order.OrderNo,
-				PaymentID:   payment.ID,
+				OrderNo:     providerOrderNo,
 				Amount:      payAmount,
 				Currency:    payCurrency,
 				Description: buildOrderSubject(order),
@@ -513,8 +506,7 @@ func (s *PaymentService) applyProviderPayment(input CreatePaymentInput, order *m
 				payment.Currency = payCurrency
 			}
 			createResult, err := stripe.CreatePayment(gatewayCtx, cfg, stripe.CreateInput{
-				OrderNo:     order.OrderNo,
-				PaymentID:   payment.ID,
+				OrderNo:     providerOrderNo,
 				Amount:      payAmount,
 				Currency:    payCurrency,
 				Description: buildOrderSubject(order),

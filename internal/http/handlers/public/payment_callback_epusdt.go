@@ -49,12 +49,15 @@ func (h *Handler) HandleEpusdtCallback(c *gin.Context) bool {
 		"raw_body", callbackRawBodyForLog(body),
 	)
 
-	// 通过 trade_id 查找支付记录
-	payment, err := h.PaymentRepo.GetLatestByProviderRef(data.TradeID)
+	// 通过 order_id（我方网关订单号）查找支付记录，降级到 trade_id（第三方流水号）
+	payment, err := h.PaymentRepo.GetByGatewayOrderNo(data.OrderID)
 	if err != nil || payment == nil {
-		log.Warnw("epusdt_callback_payment_not_found", "trade_id", data.TradeID, "error", err)
-		c.String(200, constants.EpusdtCallbackFail)
-		return true
+		payment, err = h.PaymentRepo.GetLatestByProviderRef(data.TradeID)
+		if err != nil || payment == nil {
+			log.Warnw("epusdt_callback_payment_not_found", "order_id", data.OrderID, "trade_id", data.TradeID, "error", err)
+			c.String(200, constants.EpusdtCallbackFail)
+			return true
+		}
 	}
 
 	log.Debugw("epusdt_callback_payment_found", "payment_id", payment.ID, "channel_id", payment.ChannelID)

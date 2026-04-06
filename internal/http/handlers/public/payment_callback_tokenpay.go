@@ -41,26 +41,14 @@ func (h *Handler) HandleTokenPayCallback(c *gin.Context) bool {
 		"raw_body", callbackRawBodyForLog(body),
 	)
 
-	var payment *models.Payment
-	paymentID := tokenpay.ParsePassThroughPaymentID(data.PassThroughInfo)
-	if paymentID > 0 {
-		payment, err = h.PaymentRepo.GetByID(paymentID)
-		if err != nil {
-			log.Warnw("tokenpay_callback_payment_id_lookup_failed", "payment_id", paymentID, "error", err)
-		}
-	}
-	if payment == nil {
+	payment, err := h.PaymentRepo.GetByGatewayOrderNo(data.OutOrderID)
+	if err != nil || payment == nil {
 		payment, err = h.PaymentRepo.GetLatestByProviderRef(data.TokenOrderID)
-		if err != nil {
-			log.Warnw("tokenpay_callback_payment_not_found", "token_order_id", data.TokenOrderID, "error", err)
+		if err != nil || payment == nil {
+			log.Warnw("tokenpay_callback_payment_not_found", "out_order_id", data.OutOrderID, "token_order_id", data.TokenOrderID, "error", err)
 			c.String(200, constants.TokenPayCallbackFail)
 			return true
 		}
-	}
-	if payment == nil {
-		log.Warnw("tokenpay_callback_payment_not_found", "token_order_id", data.TokenOrderID)
-		c.String(200, constants.TokenPayCallbackFail)
-		return true
 	}
 
 	channel, err := h.PaymentChannelRepo.GetByID(payment.ChannelID)

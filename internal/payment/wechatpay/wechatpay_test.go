@@ -107,9 +107,6 @@ func TestCreatePaymentH5Success(t *testing.T) {
 		if payload["out_trade_no"] != "ORDER-1001" {
 			t.Fatalf("unexpected out_trade_no: %v", payload["out_trade_no"])
 		}
-		if payload["attach"] != "1001" {
-			t.Fatalf("unexpected attach: %v", payload["attach"])
-		}
 		amount, ok := payload["amount"].(map[string]interface{})
 		if !ok {
 			t.Fatalf("amount payload missing")
@@ -158,7 +155,6 @@ func TestCreatePaymentH5Success(t *testing.T) {
 
 	result, err := CreatePayment(context.Background(), cfg, CreateInput{
 		OrderNo:     "ORDER-1001",
-		PaymentID:   1001,
 		Amount:      "10.50",
 		Currency:    "USD",
 		Description: "测试订单",
@@ -210,7 +206,6 @@ func TestCreatePaymentNativeSuccess(t *testing.T) {
 
 	result, err := CreatePayment(context.Background(), cfg, CreateInput{
 		OrderNo:     "ORDER-1002",
-		PaymentID:   1002,
 		Amount:      "1.00",
 		Currency:    "CNY",
 		Description: "测试订单",
@@ -251,7 +246,6 @@ func TestCreatePaymentResponseInvalid(t *testing.T) {
 
 	_, err = CreatePayment(context.Background(), cfg, CreateInput{
 		OrderNo:     "ORDER-1003",
-		PaymentID:   1003,
 		Amount:      "2.00",
 		Currency:    "CNY",
 		Description: "测试订单",
@@ -309,18 +303,6 @@ func TestQueryOrderByOutTradeNoSuccess(t *testing.T) {
 	}
 	if result.TransactionID == "" {
 		t.Fatalf("expected transaction id")
-	}
-}
-
-func TestParsePaymentIDFromAttach(t *testing.T) {
-	if paymentID, ok := ParsePaymentIDFromAttach("1001"); !ok || paymentID != 1001 {
-		t.Fatalf("expected payment id 1001, got %d %v", paymentID, ok)
-	}
-	if paymentID, ok := ParsePaymentIDFromAttach("payment_id%3D1002"); !ok || paymentID != 1002 {
-		t.Fatalf("expected payment id 1002, got %d %v", paymentID, ok)
-	}
-	if _, ok := ParsePaymentIDFromAttach("invalid"); ok {
-		t.Fatalf("expected invalid attach return false")
 	}
 }
 

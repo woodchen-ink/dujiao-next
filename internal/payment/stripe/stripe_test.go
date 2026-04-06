@@ -48,8 +48,7 @@ func TestVerifyAndParseWebhookCheckoutCompleted(t *testing.T) {
 				"amount_total":   1288,
 				"created":        now.Unix(),
 				"metadata": map[string]interface{}{
-					"payment_id": "1001",
-					"order_no":   "ORDER-1001",
+					"order_no": "ORDER-1001",
 				},
 			},
 		},
@@ -66,9 +65,6 @@ func TestVerifyAndParseWebhookCheckoutCompleted(t *testing.T) {
 	}
 	if result.EventType != "checkout.session.completed" {
 		t.Fatalf("unexpected event type: %s", result.EventType)
-	}
-	if result.PaymentID != 1001 {
-		t.Fatalf("unexpected payment id: %d", result.PaymentID)
 	}
 	if result.ProviderRef != "cs_test_123" {
 		t.Fatalf("unexpected provider ref: %s", result.ProviderRef)

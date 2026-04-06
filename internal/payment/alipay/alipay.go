@@ -72,13 +72,11 @@ type Config struct {
 // CreateInput 支付宝下单输入。
 type CreateInput struct {
 	OrderNo        string
-	PaymentID      uint
 	Amount         string
 	Subject        string
 	NotifyURL      string
 	ReturnURL      string
 	TimeoutExpress string
-	PassbackParams string
 	QuitURL        string
 }
 
@@ -369,9 +367,6 @@ func buildBizContent(mode string, input CreateInput) (map[string]interface{}, er
 	}
 	if strings.TrimSpace(input.TimeoutExpress) != "" {
 		bizContent["timeout_express"] = strings.TrimSpace(input.TimeoutExpress)
-	}
-	if strings.TrimSpace(input.PassbackParams) != "" {
-		bizContent["passback_params"] = strings.TrimSpace(input.PassbackParams)
 	}
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case constants.PaymentInteractionQR:

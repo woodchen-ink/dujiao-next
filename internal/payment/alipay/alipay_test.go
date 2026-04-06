@@ -98,7 +98,6 @@ func TestCreatePaymentPrecreate(t *testing.T) {
 	cfg := buildTestConfig(server.URL)
 	result, err := CreatePayment(context.Background(), cfg, CreateInput{
 		OrderNo:   "ORDER-1",
-		PaymentID: 100,
 		Amount:    "19.90",
 		Subject:   "测试商品",
 		NotifyURL: cfg.NotifyURL,
@@ -119,7 +118,6 @@ func TestCreatePaymentWAPReturnsPayURL(t *testing.T) {
 	cfg.ReturnURL = "https://example.com/pay/return"
 	result, err := CreatePayment(context.Background(), cfg, CreateInput{
 		OrderNo:   "ORDER-2",
-		PaymentID: 101,
 		Amount:    "99.99",
 		Subject:   "测试商品2",
 		NotifyURL: cfg.NotifyURL,
@@ -158,7 +156,6 @@ func TestCreatePaymentPrecreateResponseError(t *testing.T) {
 	cfg := buildTestConfig(server.URL)
 	_, err := CreatePayment(context.Background(), cfg, CreateInput{
 		OrderNo:   "ORDER-3",
-		PaymentID: 102,
 		Amount:    "10.00",
 		NotifyURL: cfg.NotifyURL,
 	}, constants.PaymentInteractionQR)
