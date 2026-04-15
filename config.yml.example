@@ -1,4 +1,4 @@
-# D&J Studio 配置文件
+# Dujiao-Next 配置文件
 
 app:
   secret_key: your-secret-key-change-in-production-please # 务必修改，用于 AES-256 加密敏感数据
