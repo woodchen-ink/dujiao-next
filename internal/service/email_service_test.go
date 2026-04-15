@@ -421,3 +421,70 @@ func TestEmailServiceSendOffice365Integration(t *testing.T) {
 
 	t.Logf("email sent via smtp.office365.com:587 to %s", to)
 }
+
+type fakeSMTPSessionCloser struct {
+	quitErr  error
+	closeErr error
+	quitCnt  int
+	closeCnt int
+}
+
+func (f *fakeSMTPSessionCloser) Quit() error {
+	f.quitCnt++
+	return f.quitErr
+}
+
+func (f *fakeSMTPSessionCloser) Close() error {
+	f.closeCnt++
+	return f.closeErr
+}
+
+func TestQuitSMTPClient(t *testing.T) {
+	t.Run("quit_success_no_close", func(t *testing.T) {
+		fake := &fakeSMTPSessionCloser{}
+		if err := quitSMTPClient(fake, "smtp.office365.com", "smtp.office365.com:587"); err != nil {
+			t.Fatalf("quitSMTPClient() returned error: %v", err)
+		}
+		if fake.quitCnt != 1 {
+			t.Fatalf("Quit() called %d times, want 1", fake.quitCnt)
+		}
+		if fake.closeCnt != 0 {
+			t.Fatalf("Close() called %d times, want 0", fake.closeCnt)
+		}
+	})
+
+	t.Run("quit_failed_fallback_close", func(t *testing.T) {
+		quitErr := errors.New("421 service not available")
+		fake := &fakeSMTPSessionCloser{quitErr: quitErr}
+		if err := quitSMTPClient(fake, "smtp.office365.com", "smtp.office365.com:587"); !errors.Is(err, quitErr) {
+			t.Fatalf("quitSMTPClient() error = %v, want %v", err, quitErr)
+		}
+		if fake.quitCnt != 1 {
+			t.Fatalf("Quit() called %d times, want 1", fake.quitCnt)
+		}
+		if fake.closeCnt != 1 {
+			t.Fatalf("Close() called %d times, want 1", fake.closeCnt)
+		}
+	})
+}
+
+func TestIsSMTPAlreadyClosedError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil", err: nil, want: false},
+		{name: "closed_network_connection", err: errors.New("use of closed network connection"), want: true},
+		{name: "connection_is_closed", err: errors.New("connection is closed"), want: true},
+		{name: "other_error", err: errors.New("dial tcp timeout"), want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isSMTPAlreadyClosedError(tt.err); got != tt.want {
+				t.Fatalf("isSMTPAlreadyClosedError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

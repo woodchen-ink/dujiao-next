@@ -13,6 +13,7 @@ import (
 	"github.com/dujiao-next/internal/config"
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/i18n"
+	"github.com/dujiao-next/internal/logger"
 	"github.com/dujiao-next/internal/models"
 	"github.com/dujiao-next/internal/telegramidentity"
 )
@@ -411,66 +412,35 @@ func buildEmailMessage(from, to, subject, body string) string {
 	return buf.String()
 }
 
-func sendMailWithSSL(addr, host, from string, to []string, msg []byte, username, password string) error {
+func sendMailWithSSL(addr, host, from string, to []string, msg []byte, username, password string) (err error) {
 	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: host})
 	if err != nil {
 		return err
 	}
-	defer func(conn *tls.Conn) {
-		err := conn.Close()
-		if err != nil {
-			fmt.Printf("failed to close TLS connection: %v\n", err)
-		}
-	}(conn)
 
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
+		if closeErr := conn.Close(); closeErr != nil && !isSMTPAlreadyClosedError(closeErr) {
+			logger.Debugw("smtp_tls_conn_close_failed", "host", host, "addr", addr, "error", closeErr)
+		}
 		return err
 	}
-	defer func(client *smtp.Client) {
-		err := client.Close()
-		if err != nil {
-			fmt.Printf("failed to close SMTP client: %v\n", err)
-		}
-	}(client)
+	defer closeSMTPClientOnError(client, &err, host, addr)
 
 	if err := authenticateSMTPClient(client, host, username, password); err != nil {
 		return err
 	}
 
-	if err := client.Mail(from); err != nil {
-		return err
-	}
-	for _, rcpt := range to {
-		if err := client.Rcpt(rcpt); err != nil {
-			return err
-		}
-	}
-	w, err := client.Data()
-	if err != nil {
-		return err
-	}
-	_, err = w.Write(msg)
-	if err != nil {
-		return err
-	}
-	if err := w.Close(); err != nil {
-		return err
-	}
-	return client.Quit()
+	err = sendSMTPData(client, host, addr, from, to, msg)
+	return err
 }
 
-func sendMailWithStartTLS(addr, host, from string, to []string, msg []byte, username, password string) error {
+func sendMailWithStartTLS(addr, host, from string, to []string, msg []byte, username, password string) (err error) {
 	client, err := smtp.Dial(addr)
 	if err != nil {
 		return err
 	}
-	defer func(client *smtp.Client) {
-		err := client.Close()
-		if err != nil {
-			fmt.Printf("failed to close SMTP client: %v\n", err)
-		}
-	}(client)
+	defer closeSMTPClientOnError(client, &err, host, addr)
 
 	if err := client.StartTLS(&tls.Config{ServerName: host}); err != nil {
 		return err
@@ -480,26 +450,23 @@ func sendMailWithStartTLS(addr, host, from string, to []string, msg []byte, user
 		return err
 	}
 
-	return sendSMTPData(client, from, to, msg)
+	err = sendSMTPData(client, host, addr, from, to, msg)
+	return err
 }
 
-func sendMailPlain(addr, host, from string, to []string, msg []byte, username, password string) error {
+func sendMailPlain(addr, host, from string, to []string, msg []byte, username, password string) (err error) {
 	client, err := smtp.Dial(addr)
 	if err != nil {
 		return err
 	}
-	defer func(client *smtp.Client) {
-		err := client.Close()
-		if err != nil {
-			fmt.Printf("failed to close SMTP client: %v\n", err)
-		}
-	}(client)
+	defer closeSMTPClientOnError(client, &err, host, addr)
 
 	if err := authenticateSMTPClient(client, host, username, password); err != nil {
 		return err
 	}
 
-	return sendSMTPData(client, from, to, msg)
+	err = sendSMTPData(client, host, addr, from, to, msg)
+	return err
 }
 
 const (
@@ -623,8 +590,13 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 	return []byte(a.password), nil
 }
 
+type smtpSessionCloser interface {
+	Quit() error
+	Close() error
+}
+
 // sendSMTPData 发送 SMTP Envelope 与邮件正文。
-func sendSMTPData(client *smtp.Client, from string, to []string, msg []byte) error {
+func sendSMTPData(client *smtp.Client, host, addr, from string, to []string, msg []byte) error {
 	if err := client.Mail(from); err != nil {
 		return err
 	}
@@ -643,7 +615,45 @@ func sendSMTPData(client *smtp.Client, from string, to []string, msg []byte) err
 	if err := w.Close(); err != nil {
 		return err
 	}
-	return client.Quit()
+	return quitSMTPClient(client, host, addr)
+}
+
+// quitSMTPClient 优先执行 SMTP QUIT；仅在 QUIT 失败时补偿 Close 回收连接。
+func quitSMTPClient(client smtpSessionCloser, host, addr string) error {
+	if client == nil {
+		return nil
+	}
+	if err := client.Quit(); err != nil {
+		if closeErr := client.Close(); closeErr != nil && !isSMTPAlreadyClosedError(closeErr) {
+			logger.Debugw("smtp_close_after_quit_failed", "host", host, "addr", addr, "error", closeErr)
+		}
+		return err
+	}
+	return nil
+}
+
+// closeSMTPClientOnError 仅在发送流程异常时兜底 Close，避免成功路径重复关闭噪音。
+func closeSMTPClientOnError(client *smtp.Client, sendErr *error, host, addr string) {
+	if client == nil || sendErr == nil || *sendErr == nil {
+		return
+	}
+	if err := client.Close(); err != nil && !isSMTPAlreadyClosedError(err) {
+		logger.Debugw("smtp_close_failed", "host", host, "addr", addr, "error", err)
+	}
+}
+
+// isSMTPAlreadyClosedError 识别连接已关闭类错误，避免重复记录无效噪音。
+func isSMTPAlreadyClosedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	if message == "" {
+		return false
+	}
+	return strings.Contains(message, "use of closed network connection") ||
+		strings.Contains(message, "closed connection") ||
+		strings.Contains(message, "connection is closed")
 }
 
 // normalizeEmailSendError 将可识别的收件人拒绝错误归一化为业务错误码。
