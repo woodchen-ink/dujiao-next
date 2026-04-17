@@ -9,6 +9,7 @@ import (
 
 	"github.com/dujiao-next/internal/cache"
 	"github.com/dujiao-next/internal/constants"
+	"github.com/dujiao-next/internal/logger"
 	"github.com/dujiao-next/internal/models"
 
 	"golang.org/x/crypto/bcrypt"
@@ -106,6 +107,9 @@ func (s *UserAuthService) upsertCZLConnectUser(info *CZLConnectUserInfo) (*model
 			if err := s.userOAuthIdentityRepo.Update(identity); err != nil {
 				return nil, err
 			}
+		}
+		if err := s.syncCZLConnectEmail(user, info); err != nil {
+			return nil, err
 		}
 		return user, nil
 	}
@@ -217,6 +221,35 @@ func (s *UserAuthService) BuildCZLConnectAuthorizeURL(ctx context.Context, req C
 		return nil, ErrCZLConnectDisabled
 	}
 	return s.czlConnectService.BuildAuthorizeURL(ctx, req)
+}
+
+// syncCZLConnectEmail 把上游最新 email 同步到本地 user.email
+// 若上游 email 已被其他本地账号占用，则保留旧邮箱并记日志，避免违反唯一约束或账号混淆。
+func (s *UserAuthService) syncCZLConnectEmail(user *models.User, info *CZLConnectUserInfo) error {
+	if user == nil || info == nil {
+		return nil
+	}
+	upstream := strings.ToLower(strings.TrimSpace(info.Email))
+	if upstream == "" || upstream == strings.ToLower(strings.TrimSpace(user.Email)) {
+		return nil
+	}
+	existing, err := s.userRepo.GetByEmail(upstream)
+	if err != nil {
+		return err
+	}
+	if existing != nil && existing.ID != user.ID {
+		logger.Warnw("czl_connect_email_conflict",
+			"local_user_id", user.ID,
+			"upstream_email", upstream,
+			"conflict_user_id", existing.ID,
+		)
+		return nil
+	}
+	now := time.Now()
+	user.Email = upstream
+	user.EmailVerifiedAt = &now
+	user.UpdatedAt = now
+	return s.userRepo.Update(user)
 }
 
 // applyCZLConnectIdentity 同步上游返回的最新资料到本地身份记录
