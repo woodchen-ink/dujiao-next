@@ -167,6 +167,15 @@ func (h *Handler) GetConfig(c *gin.Context) {
 	}
 	data["telegram_auth"] = telegramAuthConfig
 
+	// CZL Connect 开关暴露给前端，决定是否展示 SSO 登录按钮
+	czlConnectConfig := map[string]interface{}{
+		"enabled": false,
+	}
+	if h.Config != nil {
+		czlConnectConfig["enabled"] = h.Config.CZLConnect.Enabled
+	}
+	data["czl_connect"] = czlConnectConfig
+
 	affiliateSetting, err := h.SettingService.GetAffiliateSetting()
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.config_fetch_failed", err)

@@ -21,6 +21,7 @@ type Config struct {
 	UserJWT      JWTConfig          `mapstructure:"user_jwt"`
 	Bootstrap    BootstrapConfig    `mapstructure:"bootstrap"`
 	TelegramAuth TelegramAuthConfig `mapstructure:"telegram_auth"`
+	CZLConnect   CZLConnectConfig   `mapstructure:"czl_connect"`
 	Redis        RedisConfig        `mapstructure:"redis"`
 	Queue        QueueConfig        `mapstructure:"queue"`
 	Upload       UploadConfig       `mapstructure:"upload"`
@@ -101,6 +102,19 @@ type TelegramAuthConfig struct {
 	MiniAppURL         string `mapstructure:"mini_app_url"`
 	LoginExpireSeconds int    `mapstructure:"login_expire_seconds"`
 	ReplayTTLSeconds   int    `mapstructure:"replay_ttl_seconds"`
+}
+
+// CZLConnectConfig CZL Connect OAuth2 登录配置
+type CZLConnectConfig struct {
+	Enabled      bool     `mapstructure:"enabled"`       // 是否启用
+	BaseURL      string   `mapstructure:"base_url"`      // 服务基址（默认 https://connect.czl.net）
+	ClientID     string   `mapstructure:"client_id"`     // 应用 client_id
+	ClientSecret string   `mapstructure:"client_secret"` // 应用 client_secret（敏感）
+	RedirectURI  string   `mapstructure:"redirect_uri"`  // 授权回调地址
+	Scopes       []string `mapstructure:"scopes"`        // 授权域（默认 ["read"]）
+	UsePKCE      bool     `mapstructure:"use_pkce"`      // 是否启用 PKCE（建议启用）
+	StateTTL     int      `mapstructure:"state_ttl"`     // state/PKCE 有效期秒数，默认 600
+	HTTPTimeout  int      `mapstructure:"http_timeout"`  // 调用上游 HTTP 超时秒数，默认 10
 }
 
 // RedisConfig Redis 配置
@@ -296,6 +310,15 @@ func Load() *Config {
 	viper.SetDefault("telegram_auth.bot_token", "")
 	viper.SetDefault("telegram_auth.login_expire_seconds", 300)
 	viper.SetDefault("telegram_auth.replay_ttl_seconds", 300)
+	viper.SetDefault("czl_connect.enabled", false)
+	viper.SetDefault("czl_connect.base_url", "https://connect.czl.net")
+	viper.SetDefault("czl_connect.client_id", "")
+	viper.SetDefault("czl_connect.client_secret", "")
+	viper.SetDefault("czl_connect.redirect_uri", "")
+	viper.SetDefault("czl_connect.scopes", []string{"read"})
+	viper.SetDefault("czl_connect.use_pkce", true)
+	viper.SetDefault("czl_connect.state_ttl", 600)
+	viper.SetDefault("czl_connect.http_timeout", 10)
 	viper.SetDefault("redis.enabled", true)
 	viper.SetDefault("redis.host", "127.0.0.1")
 	viper.SetDefault("redis.port", 6379)

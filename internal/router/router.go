@@ -112,6 +112,12 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 			auth.POST("/telegram/login", RateLimitMiddleware(redisClient, loginRule, KeyByIP), publicHandler.UserTelegramLogin)
 			auth.POST("/telegram/miniapp/login", RateLimitMiddleware(redisClient, loginRule, KeyByIP), publicHandler.UserTelegramMiniAppLogin)
 			auth.POST("/forgot-password", publicHandler.UserForgotPassword)
+			// CZL Connect OAuth2.0 授权码流程
+			auth.GET("/czl-connect/authorize", publicHandler.CZLConnectAuthorize)
+			auth.POST("/czl-connect/authorize", publicHandler.CZLConnectAuthorize)
+			auth.GET("/czl-connect/callback", RateLimitMiddleware(redisClient, loginRule, KeyByIP), publicHandler.CZLConnectCallback)
+			auth.POST("/czl-connect/callback", RateLimitMiddleware(redisClient, loginRule, KeyByIP), publicHandler.CZLConnectCallback)
+			auth.POST("/czl-connect/refresh", publicHandler.CZLConnectRefresh)
 		}
 
 		// 用户接口（需鉴权）

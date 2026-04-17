@@ -46,6 +46,18 @@ telegram_auth:
   login_expire_seconds: 300
   replay_ttl_seconds: 300
 
+czl_connect:
+  enabled: false
+  base_url: "https://connect.czl.net"
+  client_id: ""                 # CZL Connect 应用 client_id
+  client_secret: ""             # CZL Connect 应用 client_secret（敏感）
+  redirect_uri: ""              # 前端授权回调地址，例如 https://your.site/auth/czl-connect/callback（前端路由，由前端完成 code/state 提交）
+  scopes:
+    - read
+  use_pkce: true                # 服务端应用仍建议启用 PKCE 以加固安全
+  state_ttl: 600                # state 与 code_verifier 的 Redis 有效期（秒）
+  http_timeout: 10              # 调用 CZL Connect 的 HTTP 超时（秒）
+
 redis:
   enabled: true
   host: 127.0.0.1

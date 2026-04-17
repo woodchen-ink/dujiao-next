@@ -227,7 +227,8 @@ const (
 
 // 第三方登录提供方常量
 const (
-	UserOAuthProviderTelegram = "telegram"
+	UserOAuthProviderTelegram   = "telegram"
+	UserOAuthProviderCZLConnect = "czl_connect"
 )
 
 // 登录日志状态常量
@@ -256,8 +257,18 @@ const (
 
 // 登录日志来源常量
 const (
-	LoginLogSourceWeb      = "web"
-	LoginLogSourceTelegram = "telegram"
+	LoginLogSourceWeb        = "web"
+	LoginLogSourceTelegram   = "telegram"
+	LoginLogSourceCZLConnect = "czl_connect"
+)
+
+// 登录日志失败原因常量（OAuth2）
+const (
+	LoginLogFailReasonOAuthStateInvalid  = "oauth_state_invalid"
+	LoginLogFailReasonOAuthTokenFailed   = "oauth_token_failed"
+	LoginLogFailReasonOAuthUserinfoFail  = "oauth_userinfo_failed"
+	LoginLogFailReasonOAuthConfigInvalid = "oauth_config_invalid"
+	LoginLogFailReasonOAuthDisabled      = "oauth_disabled"
 )
 
 // 验证码用途常量

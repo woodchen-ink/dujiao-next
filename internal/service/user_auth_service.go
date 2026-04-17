@@ -29,7 +29,13 @@ type UserAuthService struct {
 	settingService        *SettingService
 	emailService          *EmailService
 	telegramAuthService   *TelegramAuthService
+	czlConnectService     *CZLConnectService
 	memberLevelSvc        *MemberLevelService
+}
+
+// SetCZLConnectService 注入 CZL Connect 服务
+func (s *UserAuthService) SetCZLConnectService(svc *CZLConnectService) {
+	s.czlConnectService = svc
 }
 
 // SetMemberLevelService 设置会员等级服务

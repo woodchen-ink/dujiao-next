@@ -64,6 +64,7 @@ type Container struct {
 	AuthService               *service.AuthService
 	UserAuthService           *service.UserAuthService
 	TelegramAuthService       *service.TelegramAuthService
+	CZLConnectService         *service.CZLConnectService
 	EmailService              *service.EmailService
 	CaptchaService            *service.CaptchaService
 	UploadService             *service.UploadService
@@ -217,7 +218,9 @@ func (c *Container) initServices() {
 	c.CaptchaService = service.NewCaptchaService(c.SettingService, c.Config.Captcha)
 	c.AuthService = service.NewAuthService(c.Config, c.AdminRepo)
 	c.TelegramAuthService = service.NewTelegramAuthService(c.Config.TelegramAuth)
+	c.CZLConnectService = service.NewCZLConnectService(c.Config.CZLConnect)
 	c.UserAuthService = service.NewUserAuthService(c.Config, c.UserRepo, c.UserOAuthIdentityRepo, c.EmailVerifyCodeRepo, c.SettingService, c.EmailService, c.TelegramAuthService)
+	c.UserAuthService.SetCZLConnectService(c.CZLConnectService)
 	c.UploadService = service.NewUploadService(c.Config)
 	c.AffiliateService = service.NewAffiliateService(c.AffiliateRepo, c.UserRepo, c.OrderRepo, c.ProductRepo, c.SettingService)
 	c.ProductService = service.NewProductService(c.ProductRepo, c.ProductSKURepo, c.CardSecretRepo, c.CardSecretBatchRepo, c.CategoryRepo, c.MemberLevelPriceRepo, c.CartRepo, c.ProductMappingRepo, c.OrderRepo)
