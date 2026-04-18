@@ -158,44 +158,52 @@ func (s *MediaService) RecordLocalFile(localPath, scene string) {
 	}
 }
 
+// MigrateResult 素材迁移到图床的完整结果
+type MigrateResult struct {
+	URL      string                          `json:"url"`
+	OldPath  string                          `json:"old_path"`
+	Replaced []repository.PathReplaceResult  `json:"replaced"`
+}
+
 // MigrateToImageHosting 将本地素材上传到图床并更新 Path/ExternalKey
-// 同时替换同表中所有引用了该旧路径的记录（产品/文章中的 URL 替换由调用方处理）
-func (s *MediaService) MigrateToImageHosting(id uint) (newURL string, err error) {
+// 同时替换所有业务表中引用了该旧路径的记录，并返回每张表的替换情况
+func (s *MediaService) MigrateToImageHosting(id uint) (*MigrateResult, error) {
 	if s.imageHosting == nil || !s.imageHosting.Enabled() {
-		return "", fmt.Errorf("图床未启用")
+		return nil, fmt.Errorf("图床未启用")
 	}
 
 	media, err := s.repo.GetByID(id)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if media == nil {
-		return "", ErrMediaNotFound
+		return nil, ErrMediaNotFound
 	}
 	if IsCZLURL(media.Path) {
-		return media.Path, nil // 已是图床 URL，无需迁移
+		return &MigrateResult{URL: media.Path, OldPath: media.Path}, nil
 	}
 
 	diskPath := strings.TrimPrefix(media.Path, "/")
 	czlURL, czlKey, err := s.imageHosting.UploadFromPath(diskPath)
 	if err != nil {
-		return "", fmt.Errorf("上传图床失败: %w", err)
+		return nil, fmt.Errorf("上传图床失败: %w", err)
 	}
 
 	oldPath := media.Path
 	media.Path = czlURL
 	media.ExternalKey = czlKey
 	if err := s.repo.Update(media); err != nil {
-		return "", fmt.Errorf("更新素材记录失败: %w", err)
+		return nil, fmt.Errorf("更新素材记录失败: %w", err)
 	}
 
-	// 替换所有业务表中引用旧路径的字段
-	if err := s.repo.ReplacePathInAllTables(oldPath, czlURL); err != nil {
-		logger.Warnw("media_migrate_replace_refs_failed", "id", id, "old", oldPath, "new", czlURL, "error", err)
+	// 替换所有业务表中引用旧路径的字段，收集每个字段的结果
+	replaced, replaceErr := s.repo.ReplacePathInAllTables(oldPath, czlURL)
+	if replaceErr != nil {
+		logger.Warnw("media_migrate_replace_refs_failed", "id", id, "old", oldPath, "new", czlURL, "error", replaceErr)
 	}
 
-	logger.Infow("media_migrated_to_czl", "id", id, "old", oldPath, "new", czlURL)
-	return czlURL, nil
+	logger.Infow("media_migrated_to_czl", "id", id, "old", oldPath, "new", czlURL, "replaced", replaced)
+	return &MigrateResult{URL: czlURL, OldPath: oldPath, Replaced: replaced}, nil
 }
 
 // Rename 重命名素材

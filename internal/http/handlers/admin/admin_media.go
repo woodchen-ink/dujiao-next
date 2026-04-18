@@ -78,11 +78,15 @@ func (h *Handler) MigrateMediaToImageHosting(c *gin.Context) {
 		return
 	}
 
-	newURL, err := h.MediaService.MigrateToImageHosting(uint(id))
+	result, err := h.MediaService.MigrateToImageHosting(uint(id))
 	if err != nil {
 		shared.RespondError(c, response.CodeInternal, "error.internal", err)
 		return
 	}
 
-	response.Success(c, gin.H{"url": newURL})
+	response.Success(c, gin.H{
+		"url":      result.URL,
+		"old_path": result.OldPath,
+		"replaced": result.Replaced,
+	})
 }

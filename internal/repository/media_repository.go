@@ -19,7 +19,16 @@ type MediaRepository interface {
 	Update(media *models.Media) error
 	Delete(id uint) error
 	// ReplacePathInAllTables 将所有业务表中引用旧路径的字段替换为新路径
-	ReplacePathInAllTables(oldPath, newPath string) error
+	// 返回每个 table.column 的替换情况，便于前端展示
+	ReplacePathInAllTables(oldPath, newPath string) ([]PathReplaceResult, error)
+}
+
+// PathReplaceResult 单个表字段的替换结果
+type PathReplaceResult struct {
+	Table    string `json:"table"`
+	Column   string `json:"column"`
+	Affected int64  `json:"affected"`
+	Error    string `json:"error,omitempty"`
 }
 
 // GormMediaRepository GORM 实现
@@ -102,24 +111,25 @@ func (r *GormMediaRepository) Delete(id uint) error {
 // 覆盖：products.images、products.content、posts.thumbnail、posts.content、
 //       banners.image、banners.mobile_image、categories.icon
 // JSON 列在 PostgreSQL 下需要先转 text 再 REPLACE，SQLite 可直接操作。
-func (r *GormMediaRepository) ReplacePathInAllTables(oldPath, newPath string) error {
+func (r *GormMediaRepository) ReplacePathInAllTables(oldPath, newPath string) ([]PathReplaceResult, error) {
 	isPostgres := r.db.Dialector.Name() == "postgres"
 
 	type replaceTarget struct {
-		table    string
-		column   string
-		isJSON   bool // JSON 类型列在 PG 下需要 cast
+		table  string
+		column string
+		isJSON bool // JSON 类型列在 PG 下需要 cast
 	}
 	targets := []replaceTarget{
 		{"products", "images", true},
-		{"products", "content", true},
+		{"products", "content_json", true},
 		{"posts", "thumbnail", false},
-		{"posts", "content", true},
+		{"posts", "content_json", true},
 		{"banners", "image", false},
 		{"banners", "mobile_image", false},
 		{"categories", "icon", false},
 	}
 
+	results := make([]PathReplaceResult, 0, len(targets))
 	like := "%" + oldPath + "%"
 	for _, t := range targets {
 		var sql string
@@ -135,11 +145,16 @@ func (r *GormMediaRepository) ReplacePathInAllTables(oldPath, newPath string) er
 				t.table, t.column, t.column, t.column,
 			)
 		}
-		if err := r.db.Exec(sql, oldPath, newPath, like).Error; err != nil {
-			return fmt.Errorf("替换 %s.%s 失败: %w", t.table, t.column, err)
+		res := PathReplaceResult{Table: t.table, Column: t.column}
+		tx := r.db.Exec(sql, oldPath, newPath, like)
+		if tx.Error != nil {
+			res.Error = tx.Error.Error()
+		} else {
+			res.Affected = tx.RowsAffected
 		}
+		results = append(results, res)
 	}
-	return nil
+	return results, nil
 }
 
 // determineLikeOp 根据数据库类型返回 LIKE 操作符
