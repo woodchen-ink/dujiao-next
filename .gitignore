@@ -11,3 +11,4 @@ uploads
 */dist/
 # Added by goreleaser init:
 dist/
+cmd/server/server.exe

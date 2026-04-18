@@ -106,7 +106,21 @@ func (r *GormProductRepository) List(filter ProductListFilter) ([]models.Product
 
 	query = applyPagination(query, filter.Page, filter.PageSize)
 
-	if err := query.Order("sort_order DESC, created_at DESC").Find(&products).Error; err != nil {
+	// 有货优先，再按最低价升序
+	const inStockExpr = `CASE
+		WHEN fulfillment_type = 'manual' AND (
+			(EXISTS (SELECT 1 FROM product_skus ps WHERE ps.product_id = products.id AND ps.is_active = true AND ps.deleted_at IS NULL AND ps.manual_stock_total = -1))
+			OR (EXISTS (SELECT 1 FROM product_skus ps WHERE ps.product_id = products.id AND ps.is_active = true AND ps.deleted_at IS NULL) AND COALESCE((SELECT SUM(CASE WHEN ps.manual_stock_total > 0 THEN ps.manual_stock_total ELSE 0 END) FROM product_skus ps WHERE ps.product_id = products.id AND ps.is_active = true AND ps.deleted_at IS NULL), 0) > 0)
+			OR (NOT EXISTS (SELECT 1 FROM product_skus ps WHERE ps.product_id = products.id AND ps.is_active = true AND ps.deleted_at IS NULL) AND manual_stock_total != 0)
+		) THEN 0
+		WHEN fulfillment_type = 'auto' AND COALESCE((SELECT COUNT(*) FROM card_secrets cs WHERE cs.product_id = products.id AND cs.status = 'available' AND cs.deleted_at IS NULL), 0) > 0 THEN 0
+		WHEN fulfillment_type = 'upstream' AND (
+			EXISTS (SELECT 1 FROM product_mappings pm JOIN sku_mappings sm ON sm.product_mapping_id = pm.id AND sm.deleted_at IS NULL WHERE pm.local_product_id = products.id AND pm.deleted_at IS NULL AND sm.upstream_stock = -1)
+			OR COALESCE((SELECT SUM(CASE WHEN sm.upstream_stock > 0 THEN sm.upstream_stock ELSE 0 END) FROM product_mappings pm JOIN sku_mappings sm ON sm.product_mapping_id = pm.id AND sm.deleted_at IS NULL WHERE pm.local_product_id = products.id AND pm.deleted_at IS NULL), 0) > 0
+		) THEN 0
+		ELSE 1
+	END`
+	if err := query.Order(inStockExpr + ", price_amount ASC, sort_order DESC, created_at DESC").Find(&products).Error; err != nil {
 		return nil, 0, err
 	}
 
