@@ -31,6 +31,14 @@ type Config struct {
 	Email        EmailConfig        `mapstructure:"email"`
 	Order        OrderConfig        `mapstructure:"order"`
 	Captcha      CaptchaConfig      `mapstructure:"captcha"`
+	OpenAI       OpenAIConfig       `mapstructure:"openai"`
+}
+
+// OpenAIConfig OpenAI 接口配置
+type OpenAIConfig struct {
+	APIKey  string `mapstructure:"api_key"`  // OpenAI API Key
+	BaseURL string `mapstructure:"base_url"` // 自定义 API 基址（可用于兼容代理）
+	Model   string `mapstructure:"model"`    // 模型名称，默认 gpt-4o-mini
 }
 
 // AppConfig 应用级配置
@@ -411,6 +419,9 @@ func Load() *Config {
 	viper.SetDefault("captcha.turnstile.secret_key", "")
 	viper.SetDefault("captcha.turnstile.verify_url", "https://challenges.cloudflare.com/turnstile/v0/siteverify")
 	viper.SetDefault("captcha.turnstile.timeout_ms", 2000)
+	viper.SetDefault("openai.api_key", "")
+	viper.SetDefault("openai.base_url", "https://api.openai.com/v1")
+	viper.SetDefault("openai.model", "gpt-4o-mini")
 
 	// 环境变量支持
 	viper.AutomaticEnv()                                   // 自动读取环境变量

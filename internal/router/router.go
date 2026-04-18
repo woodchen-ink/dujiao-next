@@ -283,6 +283,9 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 				authorized.PUT("/categories/:id", adminHandler.UpdateCategory)
 				authorized.DELETE("/categories/:id", adminHandler.DeleteCategory)
 
+				// AI 辅助生成
+				authorized.POST("/ai/generate", adminHandler.AIGenerate)
+
 				// 设置管理
 				authorized.GET("/settings", adminHandler.GetSettings)
 				authorized.PUT("/settings", adminHandler.UpdateSettings)
