@@ -22,20 +22,22 @@ type czlImageResponse struct {
 
 // czlUploadData 上传成功返回的 data 字段
 type czlUploadData struct {
-	Key   string `json:"key"`
-	Name  string `json:"name"`
-	Links struct {
-		URL         string `json:"url"`
-		HTML        string `json:"html"`
-		BBCode      string `json:"bbcode"`
-		Markdown    string `json:"markdown"`
-		MarkdownSSL string `json:"markdown_with_link"`
+	Key        string `json:"key"`
+	Name       string `json:"name"`
+	OriginName string `json:"origin_name"`
+	Pathname   string `json:"pathname"`
+	Size       int    `json:"size"`
+	Mimetype   string `json:"mimetype"`
+	Extension  string `json:"extension"`
+	Links      struct {
+		URL          string `json:"url"`
+		HTML         string `json:"html"`
+		BBCode       string `json:"bbcode"`
+		Markdown     string `json:"markdown"`
+		MarkdownSSL  string `json:"markdown_with_link"`
 		ThumbnailURL string `json:"thumbnail_url"`
+		DeleteURL    string `json:"delete_url"`
 	} `json:"links"`
-	Size   int    `json:"size"`
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
-	Mime   string `json:"mime"`
 }
 
 // CZLImageHostingService 封装 CZL 图床 API 调用
@@ -59,14 +61,12 @@ func (s *CZLImageHostingService) Enabled() bool {
 	return s.cfg.Enabled && s.cfg.Token != ""
 }
 
-// UploadResult 图床上传结果
+// CZLUploadResult 图床上传结果（图床不返回宽高，由本地解码补充）
 type CZLUploadResult struct {
-	Key      string // 图片唯一标识，删除时使用
-	URL      string // 可访问的外链 URL
-	Mime     string
-	Size     int
-	Width    int
-	Height   int
+	Key  string // 图片唯一标识，删除时使用
+	URL  string // 可访问的外链 URL
+	Mime string
+	Size int
 }
 
 // Upload 上传文件到 CZL 图床，返回外链信息
@@ -120,12 +120,10 @@ func (s *CZLImageHostingService) Upload(file multipart.File, filename string) (*
 	}
 
 	return &CZLUploadResult{
-		Key:    data.Key,
-		URL:    data.Links.URL,
-		Mime:   data.Mime,
-		Size:   data.Size,
-		Width:  data.Width,
-		Height: data.Height,
+		Key:  data.Key,
+		URL:  data.Links.URL,
+		Mime: data.Mimetype,
+		Size: data.Size,
 	}, nil
 }
 

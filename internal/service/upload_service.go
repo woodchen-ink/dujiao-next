@@ -171,8 +171,8 @@ func (s *UploadService) SaveFileWithMeta(file *multipart.FileHeader, scene strin
 			Filename:    file.Filename,
 			MimeType:    czlResult.Mime,
 			Size:        int64(czlResult.Size),
-			Width:       czlResult.Width,
-			Height:      czlResult.Height,
+			Width:       imgWidth,
+			Height:      imgHeight,
 		}, nil
 	}
 
