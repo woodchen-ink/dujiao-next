@@ -7,6 +7,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -131,6 +133,25 @@ func (s *CZLImageHostingService) Upload(file multipart.File, filename string) (*
 		URL:  data.Links.URL,
 		Mime: data.Mimetype,
 	}, nil
+}
+
+// UploadFromPath 从本地文件路径上传到图床，成功后删除本地文件，返回图床外链 URL 和 key
+func (s *CZLImageHostingService) UploadFromPath(filePath string) (url string, key string, err error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return "", "", fmt.Errorf("打开本地文件失败: %w", err)
+	}
+	defer f.Close()
+
+	result, err := s.Upload(f, filepath.Base(filePath))
+	if err != nil {
+		return "", "", err
+	}
+
+	// 上传成功后删除本地文件
+	_ = os.Remove(filePath)
+
+	return result.URL, result.Key, nil
 }
 
 // Delete 从 CZL 图床删除图片（key 来自上传结果）

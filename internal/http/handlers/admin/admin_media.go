@@ -69,3 +69,20 @@ func (h *Handler) DeleteMedia(c *gin.Context) {
 
 	response.Success(c, nil)
 }
+
+// MigrateMediaToImageHosting 将本地素材上传到图床并替换 URL
+func (h *Handler) MigrateMediaToImageHosting(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		shared.RespondError(c, response.CodeBadRequest, "error.invalid_id", nil)
+		return
+	}
+
+	newURL, err := h.MediaService.MigrateToImageHosting(uint(id))
+	if err != nil {
+		shared.RespondError(c, response.CodeInternal, "error.internal", err)
+		return
+	}
+
+	response.Success(c, gin.H{"url": newURL})
+}

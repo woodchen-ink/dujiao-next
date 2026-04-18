@@ -38,6 +38,7 @@ type ProductMappingService struct {
 	connService     *SiteConnectionService
 	categoryService *CategoryService
 	mediaService    *MediaService
+	imageHosting    *CZLImageHostingService
 }
 
 // NewProductMappingService 创建商品映射服务
@@ -67,6 +68,11 @@ func (s *ProductMappingService) SetCategoryService(cs *CategoryService) {
 // SetMediaService 设置素材服务（避免循环依赖）
 func (s *ProductMappingService) SetMediaService(ms *MediaService) {
 	s.mediaService = ms
+}
+
+// SetImageHostingService 注入图床服务，启用后上游图片直传图床不落本地
+func (s *ProductMappingService) SetImageHostingService(svc *CZLImageHostingService) {
+	s.imageHosting = svc
 }
 
 // ImportUpstreamProduct 从上游导入商品（克隆为本地商品 + 建立映射）
@@ -309,25 +315,53 @@ func createSKUMappingsWithRepo(
 	return nil
 }
 
-// downloadImages 下载上游图片到本地
+// downloadImages 下载上游图片，图床启用时直传图床，否则存本地
 func (s *ProductMappingService) downloadImages(ctx context.Context, adapter upstream.Adapter, images []string) []string {
 	var localImages []string
 	for _, img := range images {
 		if strings.TrimSpace(img) == "" {
 			continue
 		}
-		localPath, err := adapter.DownloadImage(ctx, img)
+		finalPath, err := s.downloadAndStore(ctx, adapter, img)
 		if err != nil {
-			// 下载失败保留原始 URL
-			localImages = append(localImages, img)
+			localImages = append(localImages, img) // 失败保留原始 URL
 			continue
 		}
-		if s.mediaService != nil {
-			s.mediaService.RecordLocalFile(localPath, "upstream")
-		}
-		localImages = append(localImages, localPath)
+		localImages = append(localImages, finalPath)
 	}
 	return localImages
+}
+
+// downloadAndStore 下载单张图片：图床启用时直传图床返回外链，否则存本地并记录素材库
+func (s *ProductMappingService) downloadAndStore(ctx context.Context, adapter upstream.Adapter, imgURL string) (string, error) {
+	localPath, err := adapter.DownloadImage(ctx, imgURL)
+	if err != nil {
+		return "", err
+	}
+
+	// 图床启用：将本地文件上传到图床，成功后删除本地文件
+	if s.imageHosting != nil && s.imageHosting.Enabled() {
+		diskPath := strings.TrimPrefix(localPath, "/")
+		czlURL, czlKey, uploadErr := s.imageHosting.UploadFromPath(diskPath)
+		if uploadErr != nil {
+			logger.Warnw("upstream_image_czl_upload_failed", "local", localPath, "error", uploadErr)
+			// 图床上传失败降级：保留本地文件，走本地路径
+			if s.mediaService != nil {
+				s.mediaService.RecordLocalFile(localPath, "upstream")
+			}
+			return localPath, nil
+		}
+		if s.mediaService != nil {
+			s.mediaService.RecordExternalMedia(czlURL, czlKey, "upstream")
+		}
+		return czlURL, nil
+	}
+
+	// 本地存储：记录到素材库
+	if s.mediaService != nil {
+		s.mediaService.RecordLocalFile(localPath, "upstream")
+	}
+	return localPath, nil
 }
 
 // downloadContentImages 下载多语言 Content 中的图片并替换 URL
@@ -365,14 +399,11 @@ func (s *ProductMappingService) downloadContentImages(ctx context.Context, adapt
 
 	// 下载图片
 	for url := range downloaded {
-		localPath, err := adapter.DownloadImage(ctx, url)
+		finalPath, err := s.downloadAndStore(ctx, adapter, url)
 		if err != nil {
 			downloaded[url] = url // 失败保留原始
 		} else {
-			if s.mediaService != nil {
-				s.mediaService.RecordLocalFile(localPath, "upstream")
-			}
-			downloaded[url] = localPath
+			downloaded[url] = finalPath
 		}
 	}
 

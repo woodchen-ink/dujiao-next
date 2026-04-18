@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -75,6 +76,29 @@ func (s *MediaService) RecordMedia(result *UploadResult, scene string) (*models.
 	return media, nil
 }
 
+// RecordExternalMedia 将图床外链记录到素材库（图床上传成功后调用）
+func (s *MediaService) RecordExternalMedia(url, externalKey, scene string) {
+	existing, _ := s.repo.GetByPath(url)
+	if existing != nil {
+		return
+	}
+	name := filepath.Base(url)
+	if idx := strings.LastIndex(name, "."); idx > 0 {
+		name = name[:idx]
+	}
+	media := &models.Media{
+		Name:        name,
+		Filename:    filepath.Base(url),
+		Path:        url,
+		ExternalKey: externalKey,
+		MimeType:    "image/jpeg", // 上游图片均为图片类型，无需精确 MIME
+		Scene:       scene,
+	}
+	if err := s.repo.Create(media); err != nil {
+		logger.Warnw("media_record_external_failed", "url", url, "error", err)
+	}
+}
+
 // RecordLocalFile 将本地已存在的文件记录到素材库（用于下载的上游图片等）
 // localPath 格式如 /uploads/upstream/uuid.jpg，scene 如 "upstream"
 func (s *MediaService) RecordLocalFile(localPath, scene string) {
@@ -132,6 +156,46 @@ func (s *MediaService) RecordLocalFile(localPath, scene string) {
 	if err := s.repo.Create(media); err != nil {
 		logger.Warnw("media_record_local_file_failed", "path", localPath, "error", err)
 	}
+}
+
+// MigrateToImageHosting 将本地素材上传到图床并更新 Path/ExternalKey
+// 同时替换同表中所有引用了该旧路径的记录（产品/文章中的 URL 替换由调用方处理）
+func (s *MediaService) MigrateToImageHosting(id uint) (newURL string, err error) {
+	if s.imageHosting == nil || !s.imageHosting.Enabled() {
+		return "", fmt.Errorf("图床未启用")
+	}
+
+	media, err := s.repo.GetByID(id)
+	if err != nil {
+		return "", err
+	}
+	if media == nil {
+		return "", ErrMediaNotFound
+	}
+	if IsCZLURL(media.Path) {
+		return media.Path, nil // 已是图床 URL，无需迁移
+	}
+
+	diskPath := strings.TrimPrefix(media.Path, "/")
+	czlURL, czlKey, err := s.imageHosting.UploadFromPath(diskPath)
+	if err != nil {
+		return "", fmt.Errorf("上传图床失败: %w", err)
+	}
+
+	oldPath := media.Path
+	media.Path = czlURL
+	media.ExternalKey = czlKey
+	if err := s.repo.Update(media); err != nil {
+		return "", fmt.Errorf("更新素材记录失败: %w", err)
+	}
+
+	// 替换所有业务表中引用旧路径的字段
+	if err := s.repo.ReplacePathInAllTables(oldPath, czlURL); err != nil {
+		logger.Warnw("media_migrate_replace_refs_failed", "id", id, "old", oldPath, "new", czlURL, "error", err)
+	}
+
+	logger.Infow("media_migrated_to_czl", "id", id, "old", oldPath, "new", czlURL)
+	return czlURL, nil
 }
 
 // Rename 重命名素材

@@ -317,5 +317,6 @@ func (c *Container) initServices() {
 	c.MediaService = service.NewMediaService(c.MediaRepo)
 	c.MediaService.SetImageHostingService(c.CZLImageHostingService)
 	c.ProductMappingService.SetMediaService(c.MediaService)
+	c.ProductMappingService.SetImageHostingService(c.CZLImageHostingService)
 	c.AdProxyService = service.NewAdProxyService()
 }

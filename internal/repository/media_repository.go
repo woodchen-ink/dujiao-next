@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/dujiao-next/internal/models"
@@ -17,6 +18,8 @@ type MediaRepository interface {
 	Create(media *models.Media) error
 	Update(media *models.Media) error
 	Delete(id uint) error
+	// ReplacePathInAllTables 将所有业务表中引用旧路径的字段替换为新路径
+	ReplacePathInAllTables(oldPath, newPath string) error
 }
 
 // GormMediaRepository GORM 实现
@@ -93,6 +96,32 @@ func (r *GormMediaRepository) Update(media *models.Media) error {
 // Delete 软删除素材记录
 func (r *GormMediaRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Media{}, id).Error
+}
+
+// ReplacePathInAllTables 将所有业务表中引用旧路径的字段全部替换为新路径
+// 覆盖：products.images、products.content、posts.thumbnail、posts.content、
+//       banners.image、banners.mobile_image、categories.icon
+func (r *GormMediaRepository) ReplacePathInAllTables(oldPath, newPath string) error {
+	type replaceTarget struct {
+		table  string
+		column string
+	}
+	targets := []replaceTarget{
+		{"products", "images"},
+		{"products", "content"},
+		{"posts", "thumbnail"},
+		{"posts", "content"},
+		{"banners", "image"},
+		{"banners", "mobile_image"},
+		{"categories", "icon"},
+	}
+	for _, t := range targets {
+		sql := "UPDATE " + t.table + " SET " + t.column + " = REPLACE(" + t.column + ", ?, ?) WHERE " + t.column + " LIKE ?"
+		if err := r.db.Exec(sql, oldPath, newPath, "%"+oldPath+"%").Error; err != nil {
+			return fmt.Errorf("替换 %s.%s 失败: %w", t.table, t.column, err)
+		}
+	}
+	return nil
 }
 
 // determineLikeOp 根据数据库类型返回 LIKE 操作符

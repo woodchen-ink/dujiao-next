@@ -346,6 +346,7 @@ func SetupRouter(cfg *config.Config, c *provider.Container) *gin.Engine {
 				authorized.GET("/media", adminHandler.GetAdminMedia)
 				authorized.PUT("/media/:id", adminHandler.UpdateMedia)
 				authorized.DELETE("/media/:id", adminHandler.DeleteMedia)
+				authorized.POST("/media/:id/migrate-to-image-hosting", adminHandler.MigrateMediaToImageHosting)
 
 				// 订单管理
 				authorized.GET("/orders", adminHandler.AdminListOrders)
