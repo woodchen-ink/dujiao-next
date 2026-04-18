@@ -72,8 +72,7 @@ func (h *Handler) callOpenAI(systemPrompt, userPrompt string) (string, error) {
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Temperature: 0.3,
-		MaxTokens:   800,
+		MaxTokens: 16000,
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
@@ -339,7 +338,7 @@ func (h *Handler) aiProductContentPolish(data map[string]interface{}) (interface
 
 // aiProductTranslate 根据简体中文翻译商品多语言字段
 func (h *Handler) aiProductTranslate(data map[string]interface{}) (interface{}, error) {
-	field := getString(data, "field")   // title/description/content/keywords/seo_description
+	field := getString(data, "field") // title/description/content/keywords/seo_description
 	zhCN := getString(data, "zh_cn")
 	if zhCN == "" {
 		return nil, fmt.Errorf("缺少简体中文内容")
