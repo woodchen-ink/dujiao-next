@@ -195,7 +195,12 @@ func (h *Handler) aiCategorySlug(data map[string]interface{}) (interface{}, erro
 		return nil, fmt.Errorf("缺少分类名称")
 	}
 
-	system := "你是一个 SEO 专家，负责生成 URL 友好的 slug。只输出 slug，不要输出任何解释或多余文字。slug 规则：全小写英文，单词间用连字符（-）分隔，不含特殊字符，简洁清晰。"
+	system := `你是一个 SEO 专家，负责生成 URL 友好的 slug。只输出 slug，不要输出任何解释或多余文字。
+slug 规则：
+- 全小写英文单词，单词间用连字符（-）分隔
+- 中文内容必须翻译为对应的英文语义单词，禁止拼音
+- 不含特殊字符，简洁清晰，2-4 个单词为宜
+示例：「iCloud礼品卡」→ icloud-gift-card，「Steam充值卡」→ steam-gift-card`
 	user := fmt.Sprintf("请为分类「%s」生成一个 slug。", name)
 
 	raw, err := h.callOpenAI(system, user)
@@ -254,7 +259,13 @@ func (h *Handler) aiProductSlug(data map[string]interface{}) (interface{}, error
 		return nil, fmt.Errorf("缺少商品名称")
 	}
 
-	system := "你是一个 SEO 专家。只输出 slug，不要输出任何解释。slug 规则：全小写英文，单词间用连字符（-）分隔，简洁描述商品，不含特殊字符。"
+	system := `你是一个 SEO 专家，负责生成 URL 友好的商品 slug。只输出 slug，不要输出任何解释。
+slug 规则：
+- 全小写英文单词，单词间用连字符（-）分隔
+- 中文内容必须翻译为对应的英文语义单词，禁止拼音
+- 不含特殊字符，简洁描述商品核心，2-5 个单词为宜
+- 品牌名保留原文（如 iCloud、Steam、Netflix）
+示例：「iCloud礼品卡」→ icloud-gift-card，「Steam充值卡50元」→ steam-gift-card-50`
 	user := fmt.Sprintf("分类：%s\n商品名称：%s\n请生成 slug。", categoryName, title)
 
 	raw, err := h.callOpenAI(system, user)
