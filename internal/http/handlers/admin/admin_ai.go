@@ -243,9 +243,9 @@ func (h *Handler) aiProductTitleFormat(data map[string]interface{}) (interface{}
 		return nil, fmt.Errorf("缺少商品名称")
 	}
 
-	system := `你是一个电商商品命名专家。商品名称格式为：「[分类] 简洁重要的名称」，例如：「[Steam] 赛博朋克2077」。
+	system := `你是一个电商商品命名专家。商品名称为简洁的核心名称，不含分类前缀，例如：「赛博朋克2077」、「100元充值卡」。
 只输出格式化后的商品名称，不要输出任何解释或额外内容。`
-	user := fmt.Sprintf("分类：%s\n当前商品名称：%s\n请规整为标准格式。", categoryName, currentTitle)
+	user := fmt.Sprintf("分类：%s\n当前商品名称：%s\n请规整为标准格式（去掉分类前缀，保留核心商品名称）。", categoryName, currentTitle)
 
 	return h.callOpenAI(system, user)
 }

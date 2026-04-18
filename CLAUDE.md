@@ -50,7 +50,7 @@ Handler 文件：`internal/http/handlers/admin/admin_ai.go`
 |--------|------|---------------|
 | `category_slug` | 根据分类名称生成 slug | `name` |
 | `category_translate` | 翻译分类名称（繁体+英文） | `zh_cn` |
-| `product_title_format` | 规整商品名称为「[分类] 名称」格式 | `category_name`, `current_title` |
+| `product_title_format` | 规整商品名称为简洁核心名称（不含分类前缀） | `category_name`, `current_title` |
 | `product_slug` | 根据分类和名称生成商品 slug | `category_name`, `title` |
 | `product_keywords` | 生成 SEO meta keywords | `category_name`, `title` |
 | `product_seo_description` | 生成 SEO meta description | `category_name`, `title`, `description` |
