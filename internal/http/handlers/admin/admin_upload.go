@@ -22,6 +22,7 @@ func (h *Handler) UploadFile(c *gin.Context) {
 	// 保存文件并获取元数据
 	result, err := h.UploadService.SaveFileWithMeta(file, scene)
 	if err != nil {
+		logger.Errorw("upload_save_file_failed", "error", err, "scene", scene, "filename", file.Filename)
 		shared.RespondError(c, response.CodeInternal, "error.upload_failed", err)
 		return
 	}
