@@ -21,13 +21,13 @@ type czlImageResponse struct {
 	Data    json.RawMessage `json:"data"`
 }
 
-// czlUploadData 上传成功返回的 data 字段
+// czlUploadData 上传成功返回的 data 字段（size 为字符串，单位 KB）
 type czlUploadData struct {
 	Key        string `json:"key"`
 	Name       string `json:"name"`
 	OriginName string `json:"origin_name"`
 	Pathname   string `json:"pathname"`
-	Size       int    `json:"size"`
+	Size       string `json:"size"` // 图床返回字符串，如 "8.708984375"（单位 KB）
 	Mimetype   string `json:"mimetype"`
 	Extension  string `json:"extension"`
 	Links      struct {
@@ -62,12 +62,11 @@ func (s *CZLImageHostingService) Enabled() bool {
 	return s.cfg.Enabled && s.cfg.Token != ""
 }
 
-// CZLUploadResult 图床上传结果（图床不返回宽高，由本地解码补充）
+// CZLUploadResult 图床上传结果（宽高/大小由本地校验阶段补充，图床不返回）
 type CZLUploadResult struct {
 	Key  string // 图片唯一标识，删除时使用
 	URL  string // 可访问的外链 URL
 	Mime string
-	Size int
 }
 
 // Upload 上传文件到 CZL 图床，返回外链信息
@@ -131,7 +130,6 @@ func (s *CZLImageHostingService) Upload(file multipart.File, filename string) (*
 		Key:  data.Key,
 		URL:  data.Links.URL,
 		Mime: data.Mimetype,
-		Size: data.Size,
 	}, nil
 }
 

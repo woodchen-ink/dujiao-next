@@ -170,7 +170,7 @@ func (s *UploadService) SaveFileWithMeta(file *multipart.FileHeader, scene strin
 			ExternalKey: czlResult.Key,
 			Filename:    file.Filename,
 			MimeType:    czlResult.Mime,
-			Size:        int64(czlResult.Size),
+			Size:        file.Size, // 图床不返回字节数，直接用客户端上传的原始大小
 			Width:       imgWidth,
 			Height:      imgHeight,
 		}, nil
