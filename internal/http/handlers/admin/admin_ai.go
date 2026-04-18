@@ -254,13 +254,14 @@ func (h *Handler) aiProductTitleFormat(data map[string]interface{}) (interface{}
 	return h.callOpenAI(system, user)
 }
 
-// aiProductSlug 根据分类和商品名称生成商品 slug
+// aiProductSlug 根据分类和商品名称生成商品 slug，自动避免与已有商品重复
 func (h *Handler) aiProductSlug(data map[string]interface{}) (interface{}, error) {
 	categoryName := getString(data, "category_name")
 	title := getString(data, "title")
 	if title == "" {
 		return nil, fmt.Errorf("缺少商品名称")
 	}
+	excludeID := getString(data, "exclude_id")
 
 	system := `你是一个 SEO 专家，负责生成 URL 友好的商品 slug。只输出 slug，不要输出任何解释。
 slug 规则：
@@ -275,7 +276,25 @@ slug 规则：
 	if err != nil {
 		return nil, err
 	}
-	return toSlugFriendly(raw), nil
+	base := toSlugFriendly(raw)
+
+	// 查重，冲突时追加数字后缀
+	var excludePtr *string
+	if excludeID != "" {
+		excludePtr = &excludeID
+	}
+	candidate := base
+	for i := 2; ; i++ {
+		count, err := h.ProductRepo.CountBySlug(candidate, excludePtr)
+		if err != nil {
+			return nil, fmt.Errorf("检查 slug 唯一性失败: %w", err)
+		}
+		if count == 0 {
+			break
+		}
+		candidate = fmt.Sprintf("%s-%d", base, i)
+	}
+	return candidate, nil
 }
 
 // aiProductKeywords 根据分类和商品名称生成 SEO 关键词
