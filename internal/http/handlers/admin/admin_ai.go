@@ -243,9 +243,13 @@ func (h *Handler) aiProductTitleFormat(data map[string]interface{}) (interface{}
 		return nil, fmt.Errorf("缺少商品名称")
 	}
 
-	system := `你是一个电商商品命名专家。商品名称为简洁的核心名称，不含分类前缀，例如：「赛博朋克2077」、「100元充值卡」。
-只输出格式化后的商品名称，不要输出任何解释或额外内容。`
-	user := fmt.Sprintf("分类：%s\n当前商品名称：%s\n请规整为标准格式（去掉分类前缀，保留核心商品名称）。", categoryName, currentTitle)
+	system := `你是一个电商商品命名专家。规整商品名称时遵循以下规则：
+1. 去掉与分类完全重复的前缀（如商品名开头与分类名相同的部分）
+2. 保留所有区分性信息，包括面值、适用地区、ID类型、版本等关键卖点
+3. 语言通顺、简洁，不删除有意义的修饰词
+示例：「Apple iTunes礼品卡 HK $100」→「iTunes礼品卡 HK $100」；「Apple iTunes 礼品卡用于充值余额适用于香港ID」→「iTunes 礼品卡 充值余额 香港ID」
+只输出规整后的商品名称，不要输出任何解释或额外内容。`
+	user := fmt.Sprintf("分类：%s\n当前商品名称：%s\n请规整商品名称。", categoryName, currentTitle)
 
 	return h.callOpenAI(system, user)
 }
