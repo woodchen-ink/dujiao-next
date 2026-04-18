@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dujiao-next/internal/config"
+	"github.com/dujiao-next/internal/logger"
 )
 
 // czlImageResponse 图床统一响应结构
@@ -106,8 +107,14 @@ func (s *CZLImageHostingService) Upload(file multipart.File, filename string) (*
 	}
 	defer resp.Body.Close()
 
+	rawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取图床响应失败: %w", err)
+	}
+	logger.Infow("czl_image_hosting_upload_raw", "status_code", resp.StatusCode, "body", string(rawBody))
+
 	var result czlImageResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(rawBody, &result); err != nil {
 		return nil, fmt.Errorf("解析图床响应失败: %w", err)
 	}
 	if !result.Status {
@@ -118,6 +125,7 @@ func (s *CZLImageHostingService) Upload(file multipart.File, filename string) (*
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		return nil, fmt.Errorf("解析图床上传数据失败: %w", err)
 	}
+	logger.Infow("czl_image_hosting_upload_parsed", "key", data.Key, "url", data.Links.URL, "mime", data.Mimetype, "size", data.Size)
 
 	return &CZLUploadResult{
 		Key:  data.Key,
