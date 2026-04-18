@@ -101,6 +101,7 @@ type Container struct {
 	AdProxyService            *service.AdProxyService
 	MediaService              *service.MediaService
 	OrderRiskControlService   *service.OrderRiskControlService
+	CZLImageHostingService    *service.CZLImageHostingService
 }
 
 // NewContainer 初始化容器
@@ -311,7 +312,10 @@ func (c *Container) initServices() {
 	c.FulfillmentService.SetDownstreamCallbackService(c.DownstreamCallbackService)
 	c.ProcurementOrderService.SetDownstreamCallbackService(c.DownstreamCallbackService)
 	c.ProcurementOrderService.SetNotificationService(c.NotificationService)
+	c.CZLImageHostingService = service.NewCZLImageHostingService(c.Config.CZLImageHosting)
+	c.UploadService.SetImageHostingService(c.CZLImageHostingService)
 	c.MediaService = service.NewMediaService(c.MediaRepo)
+	c.MediaService.SetImageHostingService(c.CZLImageHostingService)
 	c.ProductMappingService.SetMediaService(c.MediaService)
 	c.AdProxyService = service.NewAdProxyService()
 }

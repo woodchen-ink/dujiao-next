@@ -17,12 +17,18 @@ import (
 
 // MediaService 素材管理服务
 type MediaService struct {
-	repo repository.MediaRepository
+	repo         repository.MediaRepository
+	imageHosting *CZLImageHostingService // 可选：删除图床图片时使用
 }
 
 // NewMediaService 创建素材服务实例
 func NewMediaService(repo repository.MediaRepository) *MediaService {
 	return &MediaService{repo: repo}
+}
+
+// SetImageHostingService 注入图床服务
+func (s *MediaService) SetImageHostingService(svc *CZLImageHostingService) {
+	s.imageHosting = svc
 }
 
 // List 素材列表
@@ -53,14 +59,15 @@ func (s *MediaService) RecordMedia(result *UploadResult, scene string) (*models.
 	}
 
 	media := &models.Media{
-		Name:     name,
-		Filename: result.Filename,
-		Path:     result.URL,
-		MimeType: result.MimeType,
-		Size:     result.Size,
-		Scene:    scene,
-		Width:    result.Width,
-		Height:   result.Height,
+		Name:        name,
+		Filename:    result.Filename,
+		Path:        result.URL,
+		ExternalKey: result.ExternalKey,
+		MimeType:    result.MimeType,
+		Size:        result.Size,
+		Scene:       scene,
+		Width:       result.Width,
+		Height:      result.Height,
 	}
 	if err := s.repo.Create(media); err != nil {
 		return nil, err
@@ -144,7 +151,7 @@ func (s *MediaService) Rename(id uint, name string) error {
 	return s.repo.Update(media)
 }
 
-// Delete 删除素材（软删除记录并删除物理文件）
+// Delete 删除素材（软删除记录，并根据路径类型删除图床文件或本地文件）
 func (s *MediaService) Delete(id uint) error {
 	media, err := s.repo.GetByID(id)
 	if err != nil {
@@ -156,7 +163,18 @@ func (s *MediaService) Delete(id uint) error {
 	if err := s.repo.Delete(id); err != nil {
 		return err
 	}
-	// 删除物理文件（Path 格式如 /uploads/product/2026/04/uuid.jpg）
+
+	if IsCZLURL(media.Path) {
+		// 图床文件：Path 即为完整 URL，Key 存储在 ExternalKey 字段（若为空则无法删除，仅记录警告）
+		if media.ExternalKey != "" && s.imageHosting != nil && s.imageHosting.Enabled() {
+			if err := s.imageHosting.Delete(media.ExternalKey); err != nil {
+				logger.Warnw("media_delete_czl_image_failed", "id", id, "key", media.ExternalKey, "error", err)
+			}
+		}
+		return nil
+	}
+
+	// 本地文件：Path 格式如 /uploads/product/2026/04/uuid.jpg
 	diskPath := strings.TrimPrefix(media.Path, "/")
 	if err := os.Remove(diskPath); err != nil && !os.IsNotExist(err) {
 		logger.Warnw("media_delete_file_failed", "id", id, "path", diskPath, "error", err)

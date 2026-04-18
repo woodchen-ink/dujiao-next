@@ -33,7 +33,8 @@ var allowedUploadScenes = map[string]struct{}{
 
 // UploadService 文件上传服务
 type UploadService struct {
-	cfg *config.Config
+	cfg         *config.Config
+	imageHosting *CZLImageHostingService // 可选：启用时将文件上传到图床而非本地
 }
 
 // NewUploadService 创建文件上传服务实例
@@ -41,14 +42,20 @@ func NewUploadService(cfg *config.Config) *UploadService {
 	return &UploadService{cfg: cfg}
 }
 
+// SetImageHostingService 注入图床服务（在 Container 初始化时调用）
+func (s *UploadService) SetImageHostingService(svc *CZLImageHostingService) {
+	s.imageHosting = svc
+}
+
 // UploadResult 上传结果（包含完整元数据）
 type UploadResult struct {
-	URL      string // 相对路径
-	Filename string // 原始文件名
-	MimeType string
-	Size     int64
-	Width    int
-	Height   int
+	URL         string // 本地相对路径或图床外链 URL
+	ExternalKey string // 图床图片 key（本地上传时为空）
+	Filename    string // 原始文件名
+	MimeType    string
+	Size        int64
+	Width       int
+	Height      int
 }
 
 // SaveFile 保存上传的文件（保留原签名兼容性）
@@ -151,6 +158,25 @@ func (s *UploadService) SaveFileWithMeta(file *multipart.FileHeader, scene strin
 	if _, err := src.Seek(0, 0); err != nil {
 		return nil, err
 	}
+
+	// 图床上传路径：验证通过后直接上传到 CZL 图床，不在本地落盘
+	if s.imageHosting != nil && s.imageHosting.Enabled() {
+		czlResult, err := s.imageHosting.Upload(src, file.Filename)
+		if err != nil {
+			return nil, fmt.Errorf("图床上传失败: %w", err)
+		}
+		return &UploadResult{
+			URL:         czlResult.URL,
+			ExternalKey: czlResult.Key,
+			Filename:    file.Filename,
+			MimeType:    czlResult.Mime,
+			Size:        int64(czlResult.Size),
+			Width:       czlResult.Width,
+			Height:      czlResult.Height,
+		}, nil
+	}
+
+	// 本地存储路径
 	// 生成唯一文件名
 	filename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
 	now := time.Now()

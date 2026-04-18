@@ -25,6 +25,7 @@ type Config struct {
 	Redis        RedisConfig        `mapstructure:"redis"`
 	Queue        QueueConfig        `mapstructure:"queue"`
 	Upload       UploadConfig       `mapstructure:"upload"`
+	CZLImageHosting CZLImageHostingConfig `mapstructure:"czl_image_hosting"`
 	CORS         CORSConfig         `mapstructure:"cors"`
 	Security     SecurityConfig     `mapstructure:"security"`
 	Email        EmailConfig        `mapstructure:"email"`
@@ -212,6 +213,15 @@ type UploadConfig struct {
 	MaxHeight         int      `mapstructure:"max_height"`
 }
 
+// CZLImageHostingConfig CZL 图床配置
+type CZLImageHostingConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`     // 是否启用图床（启用后文件不存本地）
+	BaseURL    string `mapstructure:"base_url"`    // API 基址，默认 https://img.czl.net/api/v1
+	Token      string `mapstructure:"token"`       // Bearer Token（敏感）
+	StrategyID int    `mapstructure:"strategy_id"` // 存储策略 ID，0 表示使用图床默认策略
+	AlbumID    int    `mapstructure:"album_id"`    // 相册 ID，0 表示不归入相册
+}
+
 // CORSConfig 跨域配置
 type CORSConfig struct {
 	AllowedOrigins   []string `mapstructure:"allowed_origins"`
@@ -335,6 +345,11 @@ func Load() *Config {
 		"default":  10,
 		"critical": 5,
 	})
+	viper.SetDefault("czl_image_hosting.enabled", false)
+	viper.SetDefault("czl_image_hosting.base_url", "https://img.czl.net/api/v1")
+	viper.SetDefault("czl_image_hosting.token", "")
+	viper.SetDefault("czl_image_hosting.strategy_id", 0)
+	viper.SetDefault("czl_image_hosting.album_id", 0)
 	viper.SetDefault("upload.max_size", 10485760)
 	viper.SetDefault("upload.allowed_types", []string{
 		"image/jpeg",
