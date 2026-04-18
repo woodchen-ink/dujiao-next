@@ -18,12 +18,12 @@ import (
 // AIGenerateRequest AI 生成请求基础结构
 type AIGenerateRequest struct {
 	Action string                 `json:"action" binding:"required"` // 生成动作类型
-	Data   map[string]interface{} `json:"data"`                      // 上下文数据
+	Data   map[string]any `json:"data"`                      // 上下文数据
 }
 
 // AIGenerateResponse AI 生成结果
 type AIGenerateResponse struct {
-	Result interface{} `json:"result"` // 生成内容（字符串或多语言对象）
+	Result any `json:"result"` // 生成内容（字符串或多语言对象）
 }
 
 // openAIMessage OpenAI chat message
@@ -142,7 +142,7 @@ func (h *Handler) AIGenerate(c *gin.Context) {
 		return
 	}
 
-	var result interface{}
+	var result any
 	var err error
 
 	switch req.Action {
@@ -162,6 +162,10 @@ func (h *Handler) AIGenerate(c *gin.Context) {
 		result, err = h.aiProductDescription(req.Data)
 	case "product_content_polish":
 		result, err = h.aiProductContentPolish(req.Data)
+	case "product_instructions_polish":
+		result, err = h.aiProductInstructionsPolish(req.Data)
+	case "product_tags":
+		result, err = h.aiProductTags(req.Data)
 	case "product_translate":
 		result, err = h.aiProductTranslate(req.Data)
 	default:
@@ -178,7 +182,7 @@ func (h *Handler) AIGenerate(c *gin.Context) {
 }
 
 // getString 从 data map 中安全读取字符串
-func getString(data map[string]interface{}, key string) string {
+func getString(data map[string]any, key string) string {
 	if v, ok := data[key]; ok {
 		if s, ok := v.(string); ok {
 			return strings.TrimSpace(s)
@@ -188,7 +192,7 @@ func getString(data map[string]interface{}, key string) string {
 }
 
 // aiCategorySlug 根据分类名称生成 slug
-func (h *Handler) aiCategorySlug(data map[string]interface{}) (interface{}, error) {
+func (h *Handler) aiCategorySlug(data map[string]any) (any, error) {
 	name := getString(data, "name")
 	if name == "" {
 		return nil, fmt.Errorf("缺少分类名称")
@@ -210,7 +214,7 @@ slug 规则：
 }
 
 // aiCategoryTranslate 根据简体中文名称翻译分类繁体和英文
-func (h *Handler) aiCategoryTranslate(data map[string]interface{}) (interface{}, error) {
+func (h *Handler) aiCategoryTranslate(data map[string]any) (any, error) {
 	zhCN := getString(data, "zh_cn")
 	if zhCN == "" {
 		return nil, fmt.Errorf("缺少简体中文名称")
@@ -236,7 +240,7 @@ func (h *Handler) aiCategoryTranslate(data map[string]interface{}) (interface{},
 }
 
 // aiProductTitleFormat 根据分类和现有名称规整商品名称格式
-func (h *Handler) aiProductTitleFormat(data map[string]interface{}) (interface{}, error) {
+func (h *Handler) aiProductTitleFormat(data map[string]any) (any, error) {
 	categoryName := getString(data, "category_name")
 	currentTitle := getString(data, "current_title")
 	if currentTitle == "" {
@@ -255,7 +259,7 @@ func (h *Handler) aiProductTitleFormat(data map[string]interface{}) (interface{}
 }
 
 // aiProductSlug 根据分类和商品名称生成商品 slug，自动避免与已有商品重复
-func (h *Handler) aiProductSlug(data map[string]interface{}) (interface{}, error) {
+func (h *Handler) aiProductSlug(data map[string]any) (any, error) {
 	categoryName := getString(data, "category_name")
 	title := getString(data, "title")
 	if title == "" {
@@ -298,7 +302,7 @@ slug 规则：
 }
 
 // aiProductKeywords 根据分类和商品名称生成 SEO 关键词
-func (h *Handler) aiProductKeywords(data map[string]interface{}) (interface{}, error) {
+func (h *Handler) aiProductKeywords(data map[string]any) (any, error) {
 	categoryName := getString(data, "category_name")
 	title := getString(data, "title")
 	if title == "" {
@@ -312,7 +316,7 @@ func (h *Handler) aiProductKeywords(data map[string]interface{}) (interface{}, e
 }
 
 // aiProductSeoDescription 生成 SEO meta description
-func (h *Handler) aiProductSeoDescription(data map[string]interface{}) (interface{}, error) {
+func (h *Handler) aiProductSeoDescription(data map[string]any) (any, error) {
 	categoryName := getString(data, "category_name")
 	title := getString(data, "title")
 	description := getString(data, "description")
@@ -327,7 +331,7 @@ func (h *Handler) aiProductSeoDescription(data map[string]interface{}) (interfac
 }
 
 // aiProductDescription 根据分类、商品名称和详情生成商品简介
-func (h *Handler) aiProductDescription(data map[string]interface{}) (interface{}, error) {
+func (h *Handler) aiProductDescription(data map[string]any) (any, error) {
 	categoryName := getString(data, "category_name")
 	title := getString(data, "title")
 	content := getString(data, "content")
@@ -342,7 +346,7 @@ func (h *Handler) aiProductDescription(data map[string]interface{}) (interface{}
 }
 
 // aiProductContentPolish 优化规整商品详情富文本内容
-func (h *Handler) aiProductContentPolish(data map[string]interface{}) (interface{}, error) {
+func (h *Handler) aiProductContentPolish(data map[string]any) (any, error) {
 	content := getString(data, "content")
 	if content == "" {
 		return nil, fmt.Errorf("缺少商品详情内容")
@@ -360,7 +364,7 @@ func (h *Handler) aiProductContentPolish(data map[string]interface{}) (interface
 }
 
 // aiProductTranslate 根据简体中文翻译商品多语言字段
-func (h *Handler) aiProductTranslate(data map[string]interface{}) (interface{}, error) {
+func (h *Handler) aiProductTranslate(data map[string]any) (any, error) {
 	field := getString(data, "field") // title/description/content/keywords/seo_description
 	zhCN := getString(data, "zh_cn")
 	if zhCN == "" {
@@ -399,6 +403,55 @@ func (h *Handler) aiProductTranslate(data map[string]interface{}) (interface{}, 
 		return nil, fmt.Errorf("解析翻译结果失败: %w", err)
 	}
 	return result, nil
+}
+
+// aiProductInstructionsPolish 优化规整交付使用说明富文本内容
+func (h *Handler) aiProductInstructionsPolish(data map[string]any) (any, error) {
+	content := getString(data, "content")
+	if content == "" {
+		return nil, fmt.Errorf("缺少使用说明内容")
+	}
+
+	system := `你是一个电商文案优化专家。对商品交付使用说明进行优化规整：
+1. 修正错别字和语病
+2. 优化步骤结构，使说明更清晰易读
+3. 保持原有 HTML/Markdown 格式标签
+4. 不添加多余内容，不删除核心信息
+只输出优化后的内容，不要输出任何解释。`
+	user := fmt.Sprintf("请优化以下交付使用说明：\n%s", content)
+
+	return h.callOpenAI(system, user)
+}
+
+// aiProductTags 根据分类和商品名称生成商品标签
+func (h *Handler) aiProductTags(data map[string]any) (any, error) {
+	categoryName := getString(data, "category_name")
+	title := getString(data, "title")
+	if title == "" {
+		return nil, fmt.Errorf("缺少商品名称")
+	}
+
+	system := `你是一个电商运营专家，负责为商品生成标签。只输出标签列表，每个标签用英文逗号分隔，不要输出解释或其他内容。
+标签规则：
+- 3-8 个标签，简短精准（1-4 个字）
+- 包含品类、使用场景、目标用户、特征等维度
+- 使用中文，不要拼音`
+	user := fmt.Sprintf("分类：%s\n商品名称：%s\n请生成商品标签。", categoryName, title)
+
+	raw, err := h.callOpenAI(system, user)
+	if err != nil {
+		return nil, err
+	}
+	// 将逗号分隔的标签解析为数组
+	parts := strings.Split(raw, ",")
+	tags := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			tags = append(tags, p)
+		}
+	}
+	return tags, nil
 }
 
 // extractJSON 从可能包含多余文字的 LLM 输出中提取 JSON 对象
