@@ -224,6 +224,15 @@ func (s *OrderRefundService) AdminManualRefund(input AdminManualRefundInput) (*m
 	recordRemark := strings.TrimSpace(input.Remark)
 	var createdRecord *models.OrderRefundRecord
 
+	cfg := DefaultOrderRefundConfig()
+	if s.settingService != nil {
+		cfgLoaded, cfgErr := s.settingService.GetOrderRefundConfig()
+		if cfgErr != nil {
+			return nil, nil, cfgErr
+		}
+		cfg = cfgLoaded
+	}
+
 	if err := s.orderRepo.Transaction(func(tx *gorm.DB) error {
 		var order models.Order
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -235,14 +244,6 @@ func (s *OrderRefundService) AdminManualRefund(input AdminManualRefundInput) (*m
 		}
 		if order.PaidAt == nil {
 			return ErrOrderStatusInvalid
-		}
-		cfg := DefaultOrderRefundConfig()
-		if s.settingService != nil {
-			cfgLoaded, cfgErr := s.settingService.GetOrderRefundConfig()
-			if cfgErr != nil {
-				return cfgErr
-			}
-			cfg = cfgLoaded
 		}
 		if isOrderRefundWindowExpired(&order, cfg.MaxRefundDays, time.Now()) {
 			return ErrOrderRefundExpired

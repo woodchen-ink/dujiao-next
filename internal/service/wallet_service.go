@@ -201,6 +201,16 @@ func (s *WalletService) AdminRefundToWallet(input AdminRefundToWalletInput) (*mo
 
 	var txnResult *models.WalletTransaction
 	var refundRecordResult *models.OrderRefundRecord
+
+	cfg := DefaultOrderRefundConfig()
+	if s.settingService != nil {
+		cfgLoaded, cfgErr := s.settingService.GetOrderRefundConfig()
+		if cfgErr != nil {
+			return nil, nil, nil, cfgErr
+		}
+		cfg = cfgLoaded
+	}
+
 	if err := s.walletRepo.Transaction(func(tx *gorm.DB) error {
 		var order models.Order
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -215,14 +225,6 @@ func (s *WalletService) AdminRefundToWallet(input AdminRefundToWalletInput) (*mo
 		}
 		if order.PaidAt == nil {
 			return ErrOrderStatusInvalid
-		}
-		cfg := DefaultOrderRefundConfig()
-		if s.settingService != nil {
-			cfgLoaded, cfgErr := s.settingService.GetOrderRefundConfig()
-			if cfgErr != nil {
-				return cfgErr
-			}
-			cfg = cfgLoaded
 		}
 		if isOrderRefundWindowExpired(&order, cfg.MaxRefundDays, time.Now()) {
 			return ErrOrderRefundExpired

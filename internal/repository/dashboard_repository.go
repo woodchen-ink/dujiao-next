@@ -95,12 +95,15 @@ type DashboardInventoryAlertRow struct {
 
 // DashboardProductRankingRow 商品排行原始行
 type DashboardProductRankingRow struct {
-	ProductID  uint
-	Title      string
-	PaidOrders int64
-	Quantity   int64
-	PaidAmount float64
-	TotalCost  float64
+	ProductID         uint
+	SKUID             uint        `gorm:"column:sku_id"`
+	SKUCode           string      `gorm:"column:sku_code"`
+	SKUSpecValuesJSON models.JSON `gorm:"column:sku_spec_values_json;type:json"`
+	Title             string
+	PaidOrders        int64
+	Quantity          int64
+	PaidAmount        float64
+	TotalCost         float64
 }
 
 // DashboardChannelRankingRow 渠道排行原始行
@@ -511,6 +514,9 @@ func (r *GormDashboardRepository) GetTopProducts(startAt, endAt time.Time, limit
 	if err := r.db.Model(&models.OrderItem{}).
 		Select(fmt.Sprintf(`
 			order_items.product_id as product_id,
+			order_items.sku_id as sku_id,
+			COALESCE(product_skus.sku_code, '') as sku_code,
+			product_skus.spec_values_json as sku_spec_values_json,
 			%s as title,
 			COUNT(DISTINCT order_items.order_id) as paid_orders,
 			COALESCE(SUM(order_items.quantity), 0) as quantity,
@@ -518,8 +524,11 @@ func (r *GormDashboardRepository) GetTopProducts(startAt, endAt time.Time, limit
 			COALESCE(SUM(CASE WHEN order_items.cost_price > 0 THEN order_items.cost_price * order_items.quantity ELSE 0 END), 0) as total_cost
 		`, titleExpr)).
 		Joins("JOIN orders ON orders.id = order_items.order_id").
+		Joins("LEFT JOIN product_skus ON product_skus.id = order_items.sku_id AND product_skus.deleted_at IS NULL").
 		Where("orders.created_at >= ? AND orders.created_at < ? AND orders.status IN ?", startAt, endAt, paidOrderStatuses()).
-		Group("order_items.product_id, title").
+		// 注意：不能把 product_skus.spec_values_json 直接放进 GROUP BY —— 在 Postgres 下 json 列没有等值运算符会报错。
+		// 通过 GROUP BY 产品主键 product_skus.id，利用 PK 函数依赖让 Postgres 允许 SELECT sku_code/spec_values_json 不必聚合。
+		Group("order_items.product_id, order_items.sku_id, product_skus.id, title").
 		Order("paid_amount DESC, quantity DESC").
 		Limit(limit).
 		Scan(&rows).Error; err != nil {

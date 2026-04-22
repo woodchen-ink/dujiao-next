@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dujiao-next/internal/cache"
+	"github.com/dujiao-next/internal/models"
 	"github.com/dujiao-next/internal/repository"
 )
 
@@ -124,13 +125,16 @@ type DashboardRankingsResponse struct {
 
 // DashboardProductRanking 商品排行项
 type DashboardProductRanking struct {
-	ProductID  uint   `json:"product_id"`
-	Title      string `json:"title"`
-	PaidOrders int64  `json:"paid_orders"`
-	Quantity   int64  `json:"quantity"`
-	PaidAmount string `json:"paid_amount"`
-	TotalCost  string `json:"total_cost"`
-	Profit     string `json:"profit"`
+	ProductID     uint        `json:"product_id"`
+	SKUID         uint        `json:"sku_id,omitempty"`
+	SKUCode       string      `json:"sku_code,omitempty"`
+	SKUSpecValues models.JSON `json:"sku_spec_values,omitempty"`
+	Title         string      `json:"title"`
+	PaidOrders    int64       `json:"paid_orders"`
+	Quantity      int64       `json:"quantity"`
+	PaidAmount    string      `json:"paid_amount"`
+	TotalCost     string      `json:"total_cost"`
+	Profit        string      `json:"profit"`
 }
 
 // DashboardChannelRanking 渠道排行项
@@ -401,13 +405,16 @@ func (s *DashboardService) GetRankings(ctx context.Context, input DashboardQuery
 			title = "-"
 		}
 		products = append(products, DashboardProductRanking{
-			ProductID:  item.ProductID,
-			Title:      title,
-			PaidOrders: item.PaidOrders,
-			Quantity:   item.Quantity,
-			PaidAmount: formatMoneyValue(item.PaidAmount),
-			TotalCost:  formatMoneyValue(item.TotalCost),
-			Profit:     formatMoneyValue(item.PaidAmount - item.TotalCost),
+			ProductID:     item.ProductID,
+			SKUID:         item.SKUID,
+			SKUCode:       item.SKUCode,
+			SKUSpecValues: item.SKUSpecValuesJSON,
+			Title:         title,
+			PaidOrders:    item.PaidOrders,
+			Quantity:      item.Quantity,
+			PaidAmount:    formatMoneyValue(item.PaidAmount),
+			TotalCost:     formatMoneyValue(item.TotalCost),
+			Profit:        formatMoneyValue(item.PaidAmount - item.TotalCost),
 		})
 	}
 

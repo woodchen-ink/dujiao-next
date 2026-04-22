@@ -132,6 +132,92 @@ func TestGetTopProductsIncludesChildOrderItems(t *testing.T) {
 	}
 }
 
+func TestGetTopProductsGroupsBySKU(t *testing.T) {
+	repo, db := setupDashboardRepositoryTest(t)
+	now := time.Now()
+	category := createDashboardCategory(t, db, "sku-category")
+
+	product := &models.Product{
+		CategoryID:      category.ID,
+		Slug:            "sku-product",
+		TitleJSON:       models.JSON{"zh-CN": "订阅"},
+		PriceAmount:     models.NewMoneyFromDecimal(decimal.NewFromInt(100)),
+		PurchaseType:    constants.ProductPurchaseMember,
+		FulfillmentType: constants.FulfillmentTypeManual,
+		IsActive:        true,
+	}
+	if err := db.Create(product).Error; err != nil {
+		t.Fatalf("create product failed: %v", err)
+	}
+
+	skuA := &models.ProductSKU{ProductID: product.ID, SKUCode: "MONTH-1", SpecValuesJSON: models.JSON{"zh-CN": "1个月"}, IsActive: true}
+	skuB := &models.ProductSKU{ProductID: product.ID, SKUCode: "MONTH-3", SpecValuesJSON: models.JSON{"zh-CN": "3个月"}, IsActive: true}
+	if err := db.Create(skuA).Error; err != nil {
+		t.Fatalf("create skuA failed: %v", err)
+	}
+	if err := db.Create(skuB).Error; err != nil {
+		t.Fatalf("create skuB failed: %v", err)
+	}
+
+	for i, combo := range []struct {
+		sku   *models.ProductSKU
+		qty   int
+		total int64
+	}{
+		{skuA, 1, 50},
+		{skuB, 2, 200},
+		{skuB, 3, 300},
+	} {
+		order := &models.Order{
+			OrderNo:        fmt.Sprintf("DJ-SKU-%d", i),
+			UserID:         1,
+			Status:         constants.OrderStatusPaid,
+			Currency:       "CNY",
+			OriginalAmount: models.NewMoneyFromDecimal(decimal.NewFromInt(combo.total)),
+			TotalAmount:    models.NewMoneyFromDecimal(decimal.NewFromInt(combo.total)),
+			CreatedAt:      now,
+		}
+		if err := db.Create(order).Error; err != nil {
+			t.Fatalf("create order failed: %v", err)
+		}
+		if err := db.Create(&models.OrderItem{
+			OrderID:         order.ID,
+			ProductID:       product.ID,
+			SKUID:           combo.sku.ID,
+			TitleJSON:       product.TitleJSON,
+			SKUSnapshotJSON: models.JSON{"sku_id": combo.sku.ID, "sku_code": combo.sku.SKUCode, "spec_values": combo.sku.SpecValuesJSON},
+			UnitPrice:       models.NewMoneyFromDecimal(decimal.NewFromInt(combo.total / int64(combo.qty))),
+			Quantity:        combo.qty,
+			TotalPrice:      models.NewMoneyFromDecimal(decimal.NewFromInt(combo.total)),
+			FulfillmentType: constants.FulfillmentTypeManual,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		}).Error; err != nil {
+			t.Fatalf("create item failed: %v", err)
+		}
+	}
+
+	rows, err := repo.GetTopProducts(now.Add(-time.Hour), now.Add(time.Hour), 10)
+	if err != nil {
+		t.Fatalf("GetTopProducts failed: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expect 2 SKU rows, got %d", len(rows))
+	}
+	if rows[0].SKUID != skuB.ID {
+		t.Fatalf("top sku want %d got %d", skuB.ID, rows[0].SKUID)
+	}
+	if rows[0].SKUCode != "MONTH-3" {
+		t.Fatalf("sku code want MONTH-3 got %q", rows[0].SKUCode)
+	}
+	if rows[0].PaidOrders != 2 || rows[0].Quantity != 5 {
+		t.Fatalf("skuB paid=%d qty=%d", rows[0].PaidOrders, rows[0].Quantity)
+	}
+	if rows[1].SKUID != skuA.ID || rows[1].SKUCode != "MONTH-1" {
+		t.Fatalf("second row want skuA got %+v", rows[1])
+	}
+}
+
 func TestPaymentStatsExcludeWalletProvider(t *testing.T) {
 	repo, db := setupDashboardRepositoryTest(t)
 	now := time.Now().UTC().Truncate(time.Second)

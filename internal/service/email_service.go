@@ -2,13 +2,16 @@ package service
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"mime"
 	"net/mail"
 	"net/smtp"
 	"strings"
+	"time"
 
 	"github.com/dujiao-next/internal/config"
 	"github.com/dujiao-next/internal/constants"
@@ -17,6 +20,29 @@ import (
 	"github.com/dujiao-next/internal/models"
 	"github.com/dujiao-next/internal/telegramidentity"
 )
+
+// writeStandardHeaders 写入 RFC 5322 要求的通用邮件头（Date、Message-ID、From、To、Subject、MIME-Version）。
+func writeStandardHeaders(buf *bytes.Buffer, from, to, subject string) {
+	buf.WriteString(fmt.Sprintf("Date: %s\r\n", time.Now().Format(time.RFC1123Z)))
+	buf.WriteString(fmt.Sprintf("Message-ID: %s\r\n", generateMessageID(from)))
+	buf.WriteString(fmt.Sprintf("From: %s\r\n", from))
+	buf.WriteString(fmt.Sprintf("To: %s\r\n", to))
+	buf.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("UTF-8", subject)))
+	buf.WriteString("MIME-Version: 1.0\r\n")
+}
+
+// generateMessageID 生成 RFC 5322 兼容的 Message-ID，域名取自 From 地址，失败则回退到 localhost。
+func generateMessageID(from string) string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	domain := "localhost"
+	if addr, err := mail.ParseAddress(from); err == nil {
+		if i := strings.LastIndex(addr.Address, "@"); i >= 0 && i < len(addr.Address)-1 {
+			domain = addr.Address[i+1:]
+		}
+	}
+	return fmt.Sprintf("<%s@%s>", hex.EncodeToString(b[:]), domain)
+}
 
 // EmailService 邮件发送服务
 type EmailService struct {
@@ -228,10 +254,7 @@ func buildEmailMessageWithAttachment(from, to, subject, body, attachName, attach
 	boundary := "----=_DujiaoNextBoundary_" + fmt.Sprintf("%d", len(body)+len(attachContent))
 
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("From: %s\r\n", from))
-	buf.WriteString(fmt.Sprintf("To: %s\r\n", to))
-	buf.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("UTF-8", subject)))
-	buf.WriteString("MIME-Version: 1.0\r\n")
+	writeStandardHeaders(&buf, from, to, subject)
 	buf.WriteString(fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"%s\"\r\n", boundary))
 	buf.WriteString("\r\n")
 
@@ -410,10 +433,7 @@ func buildFromAddress(from, name string) string {
 
 func buildEmailMessage(from, to, subject, body string) string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("From: %s\r\n", from))
-	buf.WriteString(fmt.Sprintf("To: %s\r\n", to))
-	buf.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("UTF-8", subject)))
-	buf.WriteString("MIME-Version: 1.0\r\n")
+	writeStandardHeaders(&buf, from, to, subject)
 	buf.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
 	buf.WriteString("\r\n")
 	buf.WriteString(body)
